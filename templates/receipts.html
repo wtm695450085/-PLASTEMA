@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Przyjęcie towaru · Plastema{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Magazyn główny</div><h1>Przyjęcie towaru od dostawców</h1>
+  <p class="muted">Dostawa tworzywa i barwnika od zewnętrznego dostawcy. Po kliknięciu „Przyjęto na magazyn” stan magazynu głównego rośnie od razu, bez inwentaryzacji.</p></div>
+  <form method="post" action="{{ url_for('create_receipt') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-primary" type="submit">+ Nowe przyjęcie towaru</button></form></section>
+<form class="filters" method="get">
+  <label><span>Od daty</span><input type="date" name="od" value="{{ date_from }}"></label>
+  <label><span>Do daty</span><input type="date" name="do" value="{{ date_to }}"></label>
+  <label><span>Status</span><select name="status"><option value="">Wszystkie</option><option value="OTWARTY" {% if status == 'OTWARTY' %}selected{% endif %}>otwarte</option><option value="ZREALIZOWANY" {% if status == 'ZREALIZOWANY' %}selected{% endif %}>przyjęte</option></select></label>
+  <button class="btn btn-secondary" type="submit">Filtruj</button>
+</form>
+<div class="table-card"><div class="table-scroll"><table><thead><tr><th>Numer</th><th>Data</th><th>Dostawca</th><th>Dokument dostawcy</th><th>Status</th><th class="r">Pozycji</th><th class="r">Razem kg</th><th class="r">Wartość zł</th><th>Przyjął</th><th></th></tr></thead><tbody>
+{% for r in receipts %}<tr><td><span class="code">{{ r.number }}</span></td><td>{{ r.doc_date.strftime('%d.%m.%Y') }}</td><td><strong>{{ r.supplier or '— nie wybrano —' }}</strong></td><td>{{ r.delivery_doc or '—' }}<small>{{ r.order_ref or '' }}</small></td>
+  <td><span class="badge {{ 'badge-material' if r.status == 'ZREALIZOWANY' else 'badge-color' }}">{{ 'przyjęte' if r.status == 'ZREALIZOWANY' else 'otwarte' }}</span></td><td class="r">{{ r.lines }}</td><td class="r">{{ r.kg|num }}</td><td class="r">{{ r.value|num }}</td><td>{{ r.received_by or '—' }}</td>
+  <td class="actions"><a class="btn btn-small {{ '' if r.status == 'ZREALIZOWANY' else 'btn-primary' }}" href="{{ url_for('receipt_sheet', receipt_id=r.id) }}">{{ 'Podgląd' if r.status == 'ZREALIZOWANY' else 'Otwórz' }}</a></td></tr>
+{% else %}<tr><td colspan="10" class="empty">Brak przyjęć w wybranym zakresie. Kliknij „+ Nowe przyjęcie towaru”, gdy przyjedzie dostawa.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

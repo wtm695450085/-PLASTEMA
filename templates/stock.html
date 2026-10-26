@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Stany magazynowe · Plastema{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Spis z natury</div><h1>Stany magazynowe</h1><p class="muted">Stan każdej pozycji pochodzi z ostatniego zatwierdzonego spisu z natury, w którym ją policzono.</p></div><a class="btn btn-primary" href="{{ url_for('create_inventory') }}">+ Nowa inwentaryzacja</a></section>
+<div class="stat-grid">
+  {% for key, s in summary.items() %}<a class="stat-card" href="{{ url_for('stock_index', category=key) }}"><span>{{ s.label }}</span><strong>{{ s.kg|num }} kg</strong><small>{{ s.value|num }} zł · {{ s.count }} pozycji{% if s.missing %} · {{ s.missing }} bez spisu{% endif %}</small></a>{% endfor %}
+  <div class="stat-card stat-total"><span>Wartość magazynu{% if selected_category or query or only_stock %} (filtr){% endif %}</span><strong>{{ total_value|num }} zł</strong><small>{{ rows|length }} pozycji w widoku</small></div>
+</div>
+<form class="filters" method="get">
+  <label class="search"><span>Szukaj</span><input name="q" value="{{ query }}" placeholder="Indeks, nazwa, symbol, kolor lub dostawca…"></label>
+  <label><span>Kategoria</span><select name="category"><option value="">Wszystkie</option>{% for key, label in inventory_categories.items() %}<option value="{{ key }}" {% if key == selected_category %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label class="check"><input type="checkbox" name="tylko" value="1" {% if only_stock %}checked{% endif %}><span>Tylko na stanie</span></label>
+  <button class="btn btn-secondary" type="submit">Filtruj</button>{% if query or selected_category or only_stock %}<a class="clear" href="{{ url_for('stock_index') }}">Wyczyść</a>{% endif %}
+</form>
+<div class="table-card"><div class="table-scroll"><table class="stock-table"><thead><tr><th>Indeks</th><th>Nazwa</th><th>Dostawca</th><th>Kolor</th><th class="r">Stan mag. głównego kg</th><th class="r">Na maszynach kg</th><th class="r">Cena zł/kg</th><th class="r">Wartość zł</th><th>Spis</th></tr></thead><tbody>
+{% for r in rows %}<tr class="{{ 'row-zero' if r.counted_kg == 0 else 'row-missing' if r.counted_kg is none else '' }}">
+  <td><span class="code material-code">{{ r.material_index }}</span></td>
+  <td><strong>{{ r.internal_name or r.symbol }}</strong><small>{{ r.symbol or '' }}</small></td>
+  <td>{{ r.supplier or '—' }}<small>{{ r.supplier_no or '' }}</small></td>
+  <td>{% if r.color %}<span class="badge badge-material">{{ r.color }}</span>{% else %}—{% endif %}</td>
+  <td class="r qty">{{ r.counted_kg|num }}{% if r.movement_kg %}<small>spis {{ r.base_kg|num }} · ruch {{ '+' if r.movement_kg > 0 else '' }}{{ r.movement_kg|num }}</small>{% endif %}</td><td class="r">{% if r.on_machines %}<a href="{{ url_for('machines_index') }}">{{ r.on_machines|num }}</a>{% else %}—{% endif %}</td><td class="r">{{ r.unit_price|num }}</td><td class="r"><strong>{{ r.value|num }}</strong></td>
+  <td>{% if r.number %}<a href="{{ url_for('inventory_sheet', inventory_id=r.inventory_id) }}">{{ r.number }}</a><small>{{ r.count_date.strftime('%d.%m.%Y') }}</small>{% else %}<span class="muted">brak spisu</span>{% endif %}</td>
+</tr>{% else %}<tr><td colspan="9" class="empty">Brak pozycji spełniających kryteria.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

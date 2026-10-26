@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Logowanie · Magazyn surowców{% endblock %}
+{% block content %}
+<section class="login-wrap">
+  <div class="login-card">
+    <h1>Zaloguj się</h1>
+    <p class="muted">Zamówienia i magazyn Plastema.</p>
+    <form method="post" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Login<input name="username" autocomplete="username" required autofocus></label>
+      <label>Hasło<input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="btn btn-primary btn-wide" type="submit">Zaloguj się</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

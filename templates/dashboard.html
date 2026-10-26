@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Pulpit · Plastema{% endblock %}
+{% block content %}
+<h1 class="dash-hello">Cześć, {{ ui_user.first }}</h1>
+<p class="dash-sub">Oto co dzieje się w Twojej produkcji i magazynach.</p>
+<div class="dash-grid">
+  <div class="dash-col">
+    <section class="card">
+      <div class="card-head"><h3>Wymaga Twojej uwagi</h3><small>z aktywnych modułów</small></div>
+      {% if items %}
+      <ul class="attn-list">
+        {% for i in items %}
+        <li><a href="{{ i.href }}"><span class="attn-count {{ i.tone }}">{{ i.count }}</span><span class="attn-text"><strong>{{ i.title }}</strong><small>{{ i.hint }}</small></span>{{ icon('chevron-right', 16) }}</a></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="all-clear"><span class="ok-badge">{{ icon('check', 20) }}</span><strong>Wszystko ogarnięte</strong><span>Brak otwartych dokumentów i zamówień wymagających reakcji.</span></div>
+      {% endif %}
+    </section>
+    <div class="kpis">
+      <a class="kpi" href="{{ url_for('orders_index') }}"><span>Otwarte zamówienia</span><strong>{{ kpi.open_orders }}</strong></a>
+      <a class="kpi" href="{{ url_for('settlement_index', status='ALL') }}"><span>Zamówienia produkcji</span><strong>{{ kpi.open_prod }}</strong></a>
+      <a class="kpi ok" href="{{ url_for('fg_stock') }}"><span>Wyroby na stanie (szt.)</span><strong>{{ '{:,}'.format(kpi.fg_qty|int).replace(',', ' ') }}</strong></a>
+      <a class="kpi" href="{{ url_for('clients_index') }}"><span>Klienci</span><strong>{{ kpi.clients }}</strong></a>
+    </div>
+  </div>
+  <div class="dash-col">
+    <section class="card">
+      <div class="card-head"><h3>Powiadomienia</h3><a href="{{ url_for('dashboard') }}">Wszystkie</a></div>
+      <div class="notes-empty">Brak powiadomień.</div>
+    </section>
+    <section class="card whatsnew" id="whatsnew">
+      <div class="card-head"><h3>Co nowego</h3></div>
+      {% for entry in changelog %}
+      <article class="wn-item{% if loop.index > 3 %} is-extra{% endif %}">
+        <div class="wn-meta"><span class="wn-ver">{{ entry.version }}</span><span class="wn-mod">{{ entry.module }}</span><span class="wn-date">{{ entry.date }}</span></div>
+        <ul>{% for text in entry['items'] %}<li>{{ text|safe }}</li>{% endfor %}</ul>
+      </article>
+      {% endfor %}
+      {% if changelog|length > 3 %}<button class="wn-more" type="button" data-wn-more>Pokaż starsze zmiany</button>{% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

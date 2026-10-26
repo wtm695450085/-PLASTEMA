@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Nowa inwentaryzacja · Plastema{% endblock %}
+{% block content %}
+<div class="form-heading"><div><div class="eyebrow">Spis z natury</div><h1>Nowa inwentaryzacja</h1></div><a class="back" href="{{ url_for('inventory_index') }}">← Inwentaryzacje</a></div>
+<form class="supplier-form" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <section class="form-section"><h2>Dane spisu</h2><div class="form-grid">
+    <label><span>Data spisu *</span><input type="date" name="count_date" value="{{ form.count_date }}" required></label>
+    <label><span>Zakres</span><select name="scope">{% for key, label in inventory_scopes.items() %}<option value="{{ key }}" {% if key == form.scope %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label><span>Osoba spisująca</span><input name="counted_by" value="{{ form.counted_by }}" placeholder="np. Anna Kowalska"></label>
+    <label><span>Uwagi</span><input name="notes" value="{{ form.notes }}" placeholder="np. inwentaryzacja miesięczna"></label>
+  </div></section>
+  <p class="muted">Arkusz obejmie wszystkie pozycje z wybranego zakresu. Przy każdej zobaczysz ostatni stan ze spisu, a obok wpiszesz ilość policzoną na magazynie.</p>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">Utwórz arkusz spisu</button></div>
+</form>
+{% endblock %}

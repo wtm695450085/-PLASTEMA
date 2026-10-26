@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.number }} · Plastema{% endblock %}
+{% block body_class %}theme-teal{% endblock %}
+{% block module_name %}PLASTEMA · Magazyn wyrobów gotowych{% endblock %}
+{% block content %}
+{% set editable = doc.status == 'OTWARTY' %}{% set inw = doc.doc_type == 'INW' %}
+<div class="form-heading no-print"><div><a class="back" href="{{ url_for('fg_docs') }}">← Dokumenty magazynu wyrobów</a>
+  <div class="eyebrow">{{ meta.label }}{% if doc.short_name %} · {{ doc.short_name }} ({{ doc.client_code }}){% endif %}</div>
+  <h1>{{ doc.number }} <span class="badge {{ 'badge-material' if not editable else 'badge-color' }}">{{ doc.status|lower }}</span></h1>
+  <p class="muted">{% if doc.zk_number %}Do zamówienia <a href="{{ url_for('order_detail', order_id=doc.zk_order_id) }}">{{ doc.zk_number }}</a>{% if doc.client_ref %} (nr klienta {{ doc.client_ref }}){% endif %}. {% endif %}
+    {% if inw %}Wpisz ilości policzone. Pozycja bez wpisu nie zmienia stanu. Różnica = policzono − stan w chwili zatwierdzenia.{% elif doc.doc_type == 'PW' %}Przyjęcie wyrobów gotowych z produkcji na magazyn — zwiększa stan szarży.{% elif doc.doc_type == 'WZ' %}Szarże dobrane od najstarszej (FIFO) — możesz je zmienić. Realizacja zmniejsza stan.{% else %}Zwrot zwiększa stan magazynu.{% endif %}</p></div>
+  <figure class="barcode-card"><img src="{{ barcode_uri(doc.number) }}" alt=""><figcaption>{{ doc.number }}</figcaption></figure></div>
+{% if not editable %}<div class="alert alert-success no-print">Zrealizowano {{ doc.realized_at|dt('%d.%m.%Y %H:%M') }} — {{ doc.realized_by }}. Dokumentu nie można już zmienić.</div>{% endif %}
+<div class="mail-bar no-print"><button class="btn btn-secondary" type="button" data-print>Drukuj {{ 'arkusz spisu' if inw else 'dokument' }}</button>
+  {% if mail %}<a class="btn btn-primary" href="{{ mail }}">✉ Powiadom klienta o wysyłce</a>{% endif %}</div>
+
+{% if zk_lines and doc.doc_type != 'PW' %}<section class="panel no-print"><h2>Zamówienie {{ doc.zk_number }} — wydania</h2><div class="table-scroll"><table class="analysis-table"><thead><tr><th>Lp.</th><th>Produkt</th><th class="r">Zamówiono</th><th class="r">Wydano wcześniej</th><th class="r">Na tym dokumencie</th><th class="r">Pozostanie</th></tr></thead><tbody>
+{% for l in zk_lines %}{% set rest = (l.qty or 0) - l.shipped - (l.in_doc if editable else 0) %}<tr><td>{{ l.lp }}</td><td>{{ l.product_name }}</td><td class="r">{{ l.qty|n0 }}</td><td class="r">{{ l.shipped|n0 }}</td><td class="r qty">{{ l.in_doc|n0 }}</td><td class="r {{ 'minus' if rest > 0 else 'plus' }}">{{ rest|n0 }}</td></tr>{% endfor %}
+</tbody></table></div></section>{% endif %}
+
+<form method="post" action="{{ url_for('fg_doc_save', doc_id=doc.id) }}" autocomplete="off" class="no-print">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="visually-hidden" type="submit" name="action" value="save" tabindex="-1" aria-hidden="true">Zapisz</button>
+  <section class="form-section"><div class="form-grid doc-meta">
+    <label>Data<input type="date" name="doc_date" value="{{ doc.doc_date.isoformat() }}" {% if not editable %}disabled{% endif %}></label>
+    {% if doc.doc_type in ('WZ', 'ZW') %}<label>Przewoźnik<input name="carrier" value="{{ doc.carrier or '' }}" {% if not editable %}disabled{% endif %} placeholder="np. własny transport, DPD, Raben"></label>
+    <label>Pojazd / nr przesyłki<input name="vehicle" value="{{ doc.vehicle or '' }}" {% if not editable %}disabled{% endif %}></label>
+    <label class="span-2">Adres dostawy<input name="delivery_address" value="{{ doc.delivery_address or '' }}" {% if not editable %}disabled{% endif %}></label>{% endif %}
+    {% if doc.doc_type == 'ZW' %}<label>Powód zwrotu<select name="reason" {% if not editable %}disabled{% endif %}><option value="">—</option>{% for r in fg_return_reasons %}<option {% if doc.reason == r %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>{% endif %}
+    <label>Wystawił(a)<input name="created_by" value="{{ doc.created_by or '' }}" {% if not editable %}disabled{% endif %}></label>
+    <label class="span-2">Uwagi<input name="notes" value="{{ doc.notes or '' }}" {% if not editable %}disabled{% endif %}></label>
+  </div></section>
+
+  <div class="table-card"><div class="table-scroll"><table class="inventory-table"><thead><tr><th>Produkt</th><th>Szarża</th><th>Miejsce</th>
+    {% if inw %}<th class="r">Stan w systemie</th><th class="r">Policzono</th><th class="r">Różnica</th>{% else %}<th class="r">Stan szarży</th><th class="r">Ilość szt.</th><th class="r">Kartony</th>{% endif %}<th>Uwagi</th>{% if editable %}<th></th>{% endif %}</tr></thead><tbody>
+  {% for l in lines %}{% set short = not inw and doc.doc_type == 'WZ' and editable and l.qty and (l.stock or 0) < l.qty %}<tr class="{{ 'row-big' if short or (inw and l.qty is not none and l.qty != l.expected) else '' }}">
+    <td><strong>{{ '%04d'|format(l.product_code) }} {{ l.product_name }}</strong><small>{{ l.production_code }}{% if l.ordered_qty %} · ZK poz. {{ l.ordered_qty|n0 }} szt.{% endif %}</small></td>
+    <td>{% if editable %}<input class="lot-input" name="batch_{{ l.id }}" value="{{ l.batch_code or '' }}" placeholder="{{ 'brak towaru' if not l.batch_code and doc.doc_type == 'WZ' else '' }}">{% else %}{{ l.batch_code or '—' }}{% endif %}</td>
+    <td>{% if editable %}<input class="note-input small-note" name="location_{{ l.id }}" value="{{ l.location or '' }}">{% else %}{{ l.location or '' }}{% endif %}</td>
+    {% if inw %}
+    <td class="r">{{ l.expected|n0 if l.expected is not none else '—' }}</td>
+    <td class="r">{% if editable %}<input class="qty-input" name="qty_{{ l.id }}" value="{{ l.qty if l.qty is not none else '' }}" inputmode="numeric">{% else %}<strong>{{ l.qty|n0 if l.qty is not none else '—' }}</strong>{% endif %}</td>
+    <td class="r {{ 'plus' if l.qty is not none and l.qty > (l.expected or 0) else 'minus' }}">{{ (l.qty - (l.expected or 0))|n0 if l.qty is not none else '' }}</td>
+    {% else %}
+    <td class="r {{ 'minus' if short else 'muted' }}">{{ l.stock|n0 if l.stock is not none else '0' }}</td>
+    <td class="r">{% if editable %}<input class="qty-input" name="qty_{{ l.id }}" value="{{ l.qty if l.qty is not none else '' }}" inputmode="numeric">{% else %}<strong>{{ l.qty|n0 }}</strong>{% endif %}</td>
+    <td class="r">{% if editable %}<input class="qty-input small-input" name="cartons_{{ l.id }}" value="{{ l.cartons if l.cartons is not none else '' }}" placeholder="{{ ((l.qty // l.pcs_per_carton) ~ (' + ' ~ (l.qty % l.pcs_per_carton) if l.qty % l.pcs_per_carton else '')) if l.qty and l.pcs_per_carton else '' }}">{% else %}{{ l.cartons if l.cartons is not none else (((l.qty // l.pcs_per_carton) ~ (' + ' ~ (l.qty % l.pcs_per_carton) if l.qty % l.pcs_per_carton else '')) if l.qty and l.pcs_per_carton else '') }}{% endif %}</td>
+    {% endif %}
+    <td>{% if editable %}<input class="note-input" name="note_{{ l.id }}" value="{{ l.notes or '' }}">{% else %}{{ l.notes or '' }}{% endif %}</td>
+    {% if editable %}<td class="actions"><button class="btn btn-small btn-danger" type="submit" name="action" value="delete_line:{{ l.id }}" data-confirm="Usunąć pozycję?">×</button></td>{% endif %}
+  </tr>{% else %}<tr><td colspan="9" class="empty">Brak pozycji. Dodaj produkt poniżej.</td></tr>{% endfor %}
+  <tr class="total-row"><td colspan="3"><strong>Razem</strong></td>{% if inw %}<td class="r">{{ totals.expected|n0 }}</td><td class="r"><strong>{{ totals.qty|n0 }}</strong></td><td class="r">{{ totals.diff|n0 }}</td>{% else %}<td></td><td class="r"><strong>{{ totals.qty|n0 }}</strong></td><td></td>{% endif %}<td colspan="2"></td></tr>
+  </tbody></table></div></div>
+
+  {% if editable %}
+  <div class="add-order-line">
+    <datalist id="fg-products">{% for p in products %}<option value="{{ '%04d'|format(p.code) }} {{ p.name }}">stan {{ p.qty|n0 }}</option>{% endfor %}</datalist>
+    <label class="search">Dodaj produkt<input list="fg-products" name="add_product" placeholder="kod lub nazwa"></label>
+    <label>{{ 'Policzono' if inw else 'Ilość' }}<input class="qty-input" name="add_qty" inputmode="numeric"></label>
+    <label>Szarża<input class="lot-input" name="add_batch" placeholder="{{ 'puste = FIFO' if doc.doc_type == 'WZ' else 'np. 1-1-1-090926' }}"></label>
+    {% if doc.doc_type != 'WZ' %}<label>Miejsce<input class="note-input" name="add_location"></label>{% endif %}
+    {% if zk_lines %}<label>Pozycja ZK<select name="add_order_line"><option value="">—</option>{% for z in zk_lines %}<option value="{{ z.id }}">{{ z.lp }}. {{ z.product_name }}</option>{% endfor %}</select></label>{% endif %}
+    <button class="btn btn-secondary" type="submit" name="action" value="add_line">+ Dodaj</button>
+  </div>
+  <div class="save-bar">
+    <button class="btn btn-danger" type="submit" name="action" value="delete" data-confirm="Usunąć dokument {{ doc.number }}?">Usuń</button>
+    <span class="spacer"></span><button class="btn" type="submit" name="action" value="save">Zapisz</button>
+    <label class="inline-label">Realizuje<input class="performer" name="realized_by" placeholder="imię i nazwisko"></label>
+    <button class="btn btn-primary btn-done" type="submit" name="action" value="realize" data-confirm="Zrealizować {{ doc.number }}? Stan magazynu zostanie zmieniony.">{{ 'Zatwierdź spis — skoryguj stany' if inw else ('Wydano — zdejmij ze stanu' if doc.doc_type == 'WZ' else 'Przyjęto zwrot na stan') }}</button>
+  </div>{% endif %}
+</form>
+
+<section class="print-only print-doc">
+  <h2>{{ meta.label|upper }} nr {{ doc.number }}</h2>
+  <table class="print-table"><tbody>
+    <tr><th>Data</th><td>{{ doc.doc_date|dt }}</td><th>Dostawca</th><td>PLASTEMA Sp. z o.o.</td></tr>
+    {% if not inw %}<tr><th>Odbiorca</th><td>{{ doc.client_name or '' }}</td><th>Adres dostawy</th><td>{{ doc.delivery_address or '' }}</td></tr>
+    <tr><th>Zamówienie</th><td>{{ doc.zk_number or '' }}{% if doc.client_ref %} / {{ doc.client_ref }}{% endif %}</td><th>Przewoźnik</th><td>{{ doc.carrier or '' }} {{ doc.vehicle or '' }}</td></tr>{% endif %}
+  </tbody></table>
+  <table class="print-table"><thead><tr><th>Lp.</th><th>Kod</th><th>Nazwa</th><th>Szarża</th><th>{{ 'Stan / policzono' if inw else 'Ilość szt.' }}</th><th>{{ 'Różnica' if inw else 'Kartony' }}</th></tr></thead><tbody>
+  {% for l in lines %}<tr><td>{{ loop.index }}</td><td>{{ l.production_code }}</td><td>{{ l.product_name }}</td><td>{{ l.batch_code or '' }}</td>
+    <td>{% if inw %}{{ l.expected|n0 }} / {{ l.qty|n0 if l.qty is not none else '______' }}{% else %}{{ l.qty|n0 }}{% endif %}</td>
+    <td>{% if inw %}{{ (l.qty - (l.expected or 0))|n0 if l.qty is not none else '' }}{% else %}{{ l.cartons if l.cartons is not none else '' }}{% endif %}</td></tr>{% endfor %}
+  <tr><th colspan="4">Razem</th><th>{{ totals.qty|n0 }}</th><th></th></tr></tbody></table>
+  <table class="print-table signatures-table"><tbody><tr><td>Wystawił: {{ doc.created_by or '' }}<br><br>…………………………</td><td>Wydał / zrealizował: {{ doc.realized_by or '' }}<br><br>…………………………</td><td>{{ 'Spisujący' if inw else 'Odebrał (kierowca / klient)' }}<br><br>…………………………</td></tr></tbody></table>
+</section>
+<script src="{{ url_for('static', filename='orders.js') }}" defer></script>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Zam. prod. {{ order.number }} · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Rozliczenie produkcji{% endblock %}
+{% block content %}
+{% set editable = order.status not in ('ZAKOŃCZONE', 'ANULOWANE') %}
+<div class="form-heading no-print"><div><a class="back" href="{{ url_for('settlement_index') }}">← Rozliczenie produkcji</a>
+  <div class="eyebrow">Zamówienie produkcji · {{ order.short_name }} ({{ order.client_code }}){% if order.zk_number %} · z <a href="{{ url_for('order_detail', order_id=order.zk_order_id) }}">{{ order.zk_number }}</a>{% endif %}</div>
+  <h1><span class="code">{{ order.number }}</span> {{ order.product_name }} <span class="status status-{{ 'w-produkcji' if order.status == 'W PRODUKCJI' else ('zrealizowane' if order.status == 'ZAKOŃCZONE' else ('anulowane' if order.status == 'ANULOWANE' else 'przyjęte')) }}">{{ order.status|lower }}</span></h1>
+  <p class="muted">Wtryskarka {{ order.machine_no or '—' }} · forma {% if order.mold_id %}<a href="{{ url_for('mold_passport', mold_id=order.mold_id) }}">{{ order.mold_no }}</a> {{ order.mold_name }}{% if order.mold_storage %} (pole {{ order.mold_storage }}){% endif %}{% else %}—{% endif %}</p></div>
+  {% if order.batch_code %}<figure class="barcode-card"><span class="barcode-label">Kod szarży N-Z-S-DDMMRR</span><img src="{{ barcode_uri(order.batch_code) }}" alt=""><figcaption>{{ order.batch_code }}</figcaption></figure>
+  {% else %}<div class="barcode-card muted">Kod szarży nada się<br>przy pierwszej zmianie</div>{% endif %}</div>
+
+<div class="mail-bar no-print"><a class="btn btn-primary" href="{{ url_for('settlement_zlecenie', order_id=order.id) }}" target="_blank">🖨 Zamówienie produkcji (dokument z kodami)</a><button class="btn btn-secondary" type="button" data-print>Drukuj zamówienie produkcji i specyfikację</button>
+  <a class="btn" href="{{ url_for('stats_index', zam=order.number) }}">Wiersze w statystyce</a><a class="btn" href="{{ url_for('machine_plan') }}">Plan produkcji — 9 wtryskarek</a></div>
+
+<section class="panel checks-panel no-print"><h2>Punkty kontrolne zamówienia</h2><ul class="check-list">
+  {% for code in ('K1', 'K2', 'K3', 'K9', 'K10', 'K12') %}{% set c = checks[code] %}<li class="check-{{ {'ok': 'ok', 'warn': 'warn', 'error': 'error'}.get(c[0], 'none') }}"><b>{{ code }}</b> {{ settlement_checks[code] }} — {{ c[1] }}</li>{% endfor %}
+</ul></section>
+
+<form method="post" class="no-print" action="{{ url_for('settlement_order_save', order_id=order.id) }}" autocomplete="off">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="visually-hidden" type="submit" name="action" value="save" tabindex="-1" aria-hidden="true">Zapisz</button>
+  {% with o=order %}{% include '_prod_order_header.html' %}{% endwith %}
+
+  <section class="form-section"><h2>Specyfikacja (dok. 3) i stan rozliczenia kolorów</h2>
+    <div class="table-scroll"><table class="spec-table"><thead><tr><th>Lp.</th><th>Kolor</th><th>Barwnik</th><th class="r">Doz. %</th><th class="r">Zamówiono</th><th class="r">Dobre</th><th>Zostało</th><th class="r">Cykle</th><th class="r">Braki</th><th class="r">%</th><th class="r">Przyjęto</th><th>Status</th><th>Kod produkcji</th><th></th></tr></thead><tbody>
+    {% for c in colors %}{% set s = c.summary %}<tr class="{{ 'row-zero' if c.status == 'X' else '' }}">
+      <td class="num">{{ c.lp }}</td>
+      <td>{% if editable and c.status != 'ROZLICZONY' %}<select name="color_{{ c.id }}"><option value="">{{ c.color_name }}</option>{% for col in palette %}<option value="{{ col.id }}" {% if c.color_id == col.id %}selected{% endif %}>{{ col.code }} {{ col.name }}</option>{% endfor %}</select><input type="hidden" name="color_name_{{ c.id }}" value="{{ c.color_name }}">{% else %}<strong>{{ c.color_name }}</strong>{% endif %}
+        <small>{{ c.color_code or '' }}{% if c.product_variant %} · {{ '%04d'|format(c.product_code) }} {{ c.product_variant }}{% endif %}</small></td>
+      <td>{% if editable and c.status != 'ROZLICZONY' %}<select name="colorant_{{ c.id }}"><option value="">—</option>{% for b in bt %}<option value="{{ b.id }}" {% if c.colorant_id == b.id %}selected{% endif %}>{{ b.material_index }} {{ b.symbol }}</option>{% endfor %}</select>{% else %}{{ c.colorant_index or '' }} {{ c.colorant_symbol or '' }}{% endif %}</td>
+      <td class="r">{% if editable and c.status != 'ROZLICZONY' %}<input class="qty-input small-input" name="dosage_{{ c.id }}" value="{{ c.dosage_pct|num if c.dosage_pct is not none else '' }}">{% else %}{{ c.dosage_pct|num if c.dosage_pct is not none else '' }}{% endif %}</td>
+      <td class="r">{% if editable and c.status != 'ROZLICZONY' %}<input class="qty-input" name="qty_{{ c.id }}" value="{{ c.qty_ordered }}" inputmode="numeric">{% else %}<input type="hidden" name="qty_{{ c.id }}" value="{{ c.qty_ordered }}">{{ c.qty_ordered|n0 }}{% endif %}</td>
+      <td class="r qty">{{ s.good|n0 if s.good else '—' }}</td><td>{{ s.remaining_label }}</td>
+      <td class="r">{{ ('≥ ' if s.partial else '') ~ (s.cycles|n0) if s.cycles is not none else '—' }}</td>
+      <td class="r {{ 'minus' if s.scrap is not none and s.scrap < 0 else '' }}">{{ s.scrap|n0 if s.scrap is not none else '—' }}</td><td class="r">{{ s.scrap_pct|num if s.scrap_pct is not none else '' }}</td>
+      <td class="r {{ 'minus' if c.stat_qty is not none and c.received|int != c.stat_qty|int else '' }}">{{ c.received|n0 if c.received else '—' }}</td>
+      <td><span class="status cstatus-{{ c.status|replace(' ', '-')|lower }}">{{ c.status|lower }}</span>{% if editable and c.status != 'ROZLICZONY' %}<label class="check-inline x-flag"><input type="checkbox" name="x_{{ c.id }}" value="1" {% if c.status == 'X' %}checked{% endif %}> X</label>{% endif %}</td>
+      <td><small class="code">{{ c.codes.production or '—' }}</small></td>
+      <td class="actions">{% if c.status != 'X' %}<a class="btn btn-small btn-primary" href="{{ url_for('settlement_color', color_id=c.id) }}">{{ 'Rozliczenie' if c.status == 'ROZLICZONY' else 'Raport zmianowy' }}</a>{% endif %}
+        {% if editable and not s.rows %}<button class="btn btn-small btn-danger" type="submit" name="action" value="delete_color:{{ c.id }}" data-confirm="Usunąć kolor ze specyfikacji?">×</button>{% endif %}</td>
+    </tr>{% endfor %}
+    <tr class="total-row"><td colspan="4"><strong>Razem</strong></td><td class="r"><strong>{{ totals.ordered|n0 }}</strong></td><td class="r"><strong>{{ totals.good|n0 }}</strong></td><td>{% if totals.surplus %}+{{ totals.surplus }}{% endif %}</td><td class="r">{{ totals.cycles|n0 if totals.cycles else '' }}</td><td class="r">{{ totals.scrap|n0 if totals.cycles else '' }}</td><td class="r">{{ totals.scrap_pct|num if totals.scrap_pct is not none else '' }}</td><td class="r">{{ totals.received|n0 }}</td><td colspan="3"></td></tr>
+    </tbody></table></div>
+    <p class="muted catalog-hint">Braki i % liczone tylko dla kolorów z pełnym licznikiem PLC. „X” = kolor nie produkowany (nie wlicza się do sumy K1).</p>
+    {% if editable %}<div class="add-order-line"><label>Nowy kolor<select name="new_color"><option value="">—</option>{% for col in palette %}<option value="{{ col.id }}">{{ col.code }} {{ col.name }}</option>{% endfor %}</select></label>
+      <label class="search">Wariant produktu (opcjonalnie)<input list="variants" name="new_variant"></label><label>Ilość<input class="qty-input" name="new_qty" inputmode="numeric"></label>
+      <button class="btn btn-secondary" type="submit" name="action" value="add_color">+ Dodaj kolor</button>
+      <datalist id="variants">{% for p in products %}<option value="{{ '%04d'|format(p.code) }} {{ p.name }}"></option>{% endfor %}</datalist></div>{% endif %}
+  </section>
+  <div class="save-bar">
+    {% if order.status == 'ANULOWANE' %}<button class="btn" type="submit" name="action" value="reopen">Przywróć zamówienie</button>
+    {% else %}<button class="btn btn-danger" type="submit" name="action" value="{{ 'delete' if order.status == 'PLANOWANE' else 'cancel' }}" data-confirm="{{ 'Usunąć' if order.status == 'PLANOWANE' else 'Anulować' }} zamówienie {{ order.number }}?">{{ 'Usuń' if order.status == 'PLANOWANE' else 'Anuluj' }}</button>{% endif %}
+    <span class="spacer"></span>
+    {% if editable %}<button class="btn btn-primary" type="submit" name="action" value="save">Zapisz zamówienie i specyfikację</button>{% endif %}
+  </div>
+</form>
+
+{# --- wydruk: dok. 2 + dok. 3 --- #}
+<section class="print-only print-doc">
+  <h2>ZAMÓWIENIE PRODUKCJI nr {{ order.number }}</h2>
+  <table class="print-table"><tbody>
+    <tr><th>Klient</th><td>{{ order.short_name }} ({{ order.client_code }})</td><th>Data zamówienia</th><td>{{ order.order_date|dt }}</td></tr>
+    <tr><th>Produkt</th><td>{{ order.product_name }}</td><th>Planowana realizacja</th><td>{{ order.planned_start|dt }} – {{ order.planned_end|dt }}</td></tr>
+    <tr><th>Wtryskarka</th><td>{{ order.machine_no or '' }}</td><th>Forma</th><td>{{ order.mold_no or '' }} {{ order.mold_name or '' }}</td></tr>
+    <tr><th>Ilość</th><td>{{ order.qty_total|n0 }} szt.</td><th>Kod szarży</th><td>{{ order.batch_code or '' }}</td></tr>
+    <tr><th>Zapotrzebowanie</th><td colspan="3">{{ order.material_index or '' }} {{ order.material_name or order.material_text or '' }} {{ order.material_share|num }}% — {{ order.material_kg|num if order.material_kg else '' }} kg{% if order.material2_id %}; {{ order.material2_index }} {{ order.material2_name }} {{ order.material2_share|num }}%{% endif %}</td></tr>
+    <tr><th>Uwagi</th><td colspan="3">{{ order.notes or '' }}</td></tr>
+    <tr><th>Wystawił</th><td>{{ order.issued_by or '' }}</td><th>Podpis przyjmującego</th><td>{{ order.accepted_by or '' }}</td></tr>
+  </tbody></table>
+  <h2>SPECYFIKACJA DO ZAMÓWIENIA {{ order.number }}</h2>
+  <table class="print-table"><thead><tr><th>Lp.</th><th>Kolor</th><th>Symbol barwnika</th><th>Dozowanie</th><th>Ilość zamówiona</th><th>Ilość wyprodukowana</th><th>Kod produkcji</th></tr></thead><tbody>
+  {% for c in colors %}<tr><td>{{ c.lp }}</td><td>{{ c.color_name }}</td><td>{{ c.colorant_symbol or '' }}</td><td>{{ c.dosage_pct|num if c.dosage_pct is not none else '' }}%</td>
+    <td>{{ 'X' if c.status == 'X' else c.qty_ordered|n0 }}</td><td>{{ c.spec_good|n0 if c.spec_good is not none else '' }}</td><td>{{ c.codes.production or '' }}</td></tr>{% endfor %}
+  <tr><th colspan="4">Razem</th><th>{{ totals.ordered|n0 }}</th><th></th><th></th></tr></tbody></table>
+</section>
+<script src="{{ url_for('static', filename='orders.js') }}" defer></script>
+{% endblock %}

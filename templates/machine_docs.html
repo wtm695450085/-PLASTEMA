@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Dokumenty maszyn · Plastema{% endblock %}
+{% block body_class %}theme-green{% endblock %}
+{% block module_name %}Magazyny przy maszynach{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Magazyny przy maszynach</div><h1>Historia dokumentów</h1><p class="muted">Wydania, uzupełnienia, zużycie i zwroty — wybierz zakres dat.</p></div><a class="back" href="{{ url_for('machines_index') }}">← Maszyny</a></section>
+<form class="filters" method="get">
+  <label><span>Od daty</span><input type="date" name="od" value="{{ date_from }}"></label>
+  <label><span>Do daty</span><input type="date" name="do" value="{{ date_to }}"></label>
+  <label><span>Maszyna</span><select name="maszyna"><option value="">Wszystkie</option>{% for i in range(1, machine_count + 1) %}<option value="{{ i }}" {% if machine == i|string %}selected{% endif %}>Maszyna {{ i }}</option>{% endfor %}</select></label>
+  <label><span>Typ</span><select name="typ"><option value="">Wszystkie</option>{% for key, meta in doc_types.items() %}<option value="{{ key }}" {% if doc_type == key %}selected{% endif %}>{{ meta.label }}</option>{% endfor %}</select></label>
+  <label><span>Status</span><select name="status"><option value="">Wszystkie</option><option value="OTWARTY" {% if status == 'OTWARTY' %}selected{% endif %}>otwarte</option><option value="ZREALIZOWANY" {% if status == 'ZREALIZOWANY' %}selected{% endif %}>zrealizowane</option></select></label>
+  <button class="btn btn-secondary" type="submit">Filtruj</button>
+</form>
+<div class="table-card"><div class="table-scroll"><table><thead><tr><th>Dokument</th><th>Typ</th><th>Maszyna</th><th>Data</th><th>Status</th><th class="r">Pozycji</th><th class="r">Razem kg</th><th>Wykonał</th><th></th></tr></thead><tbody>
+{% for d in docs %}<tr><td><span class="code">{{ d.number }}</span></td><td>{{ doc_types[d.doc_type].label }}</td><td>Maszyna {{ d.machine_id }}</td><td>{{ d.doc_date.strftime('%d.%m.%Y') }}<small>{{ d.shift or '' }}</small></td><td><span class="badge {{ 'badge-material' if d.status == 'ZREALIZOWANY' else 'badge-color' }}">{{ d.status|lower }}</span></td><td class="r">{{ d.lines }}</td><td class="r">{{ d.kg|num }}</td><td>{{ d.realized_by or '—' }}</td><td class="actions"><a class="btn btn-small" href="{{ url_for('machine_doc', doc_id=d.id) }}">{{ 'Otwórz' if d.status == 'OTWARTY' else 'Podgląd' }}</a></td></tr>
+{% else %}<tr><td colspan="9" class="empty">Brak dokumentów w wybranym zakresie.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

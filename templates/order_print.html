@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Naklejka {{ order.number }} · Plastema{% endblock %}
+{% block body_class %}theme-blue order-print-page{% endblock %}
+{% block module_name %}PLASTEMA · Zamówienia{% endblock %}
+{% block content %}
+<div class="mail-bar no-print"><button class="btn btn-primary" type="button" data-print>Drukuj</button><a class="btn" href="{{ url_for('order_detail', order_id=order.id) }}">← Wróć do zamówienia</a></div>
+<div class="op-sheet">
+  <header class="op-head">
+    <div><b class="op-brand">PLASTEMA</b><span>Zamówienie klienta</span></div>
+    <div class="op-meta"><strong>{{ order.client_name }}</strong> ({{ order.short_name }}, {{ order.client_code }})<br>
+      złożone {{ order.order_date|dt }}{% if order.requested_date %} · żądany termin {{ order.requested_date|dt }}{% endif %}{% if order.client_ref %} · nr klienta {{ order.client_ref }}{% endif %}</div>
+  </header>
+  <section class="op-main">
+    <img src="{{ barcode_uri(order.number, 1.2, 26) }}" alt="Kod kreskowy {{ order.number }}">
+    <div class="op-main-no">{{ order.number }}</div>
+    <div class="op-main-digits">{{ order.number|replace(' ', '')|replace('ZK', '') }}</div>
+  </section>
+  {% for r in rows %}{% set l = r.line %}
+  <section class="op-line">
+    <div class="op-line-head"><span class="op-lp">{{ l.lp }}</span><strong>{{ l.product_name }}</strong>
+      <span class="op-qty">{{ l.qty|n0 }} szt.{% if l.color_code %} · {{ l.color_code }} {{ l.color_name or '' }}{% endif %}</span></div>
+    {% if r.production_code %}
+    <figure class="op-code"><figcaption>Kod produkcji AAA-BBBB-CCC</figcaption><img src="{{ barcode_uri(r.production_code, 1.2, 24) }}" alt=""><div>{{ r.production_code }}</div></figure>
+    <figure class="op-code"><figcaption>Pełny kod AAA-BBBB-CCC-EEE-FFF-GGG</figcaption><img src="{{ barcode_uri(r.full_code, 0.8, 24) }}" alt=""><div>{{ r.full_code }}</div></figure>
+    {% endif %}
+    {% if l.batch_code %}<figure class="op-code"><figcaption>Kod szarży N-Z-S-DDMMRR</figcaption><img src="{{ barcode_uri(l.batch_code, 1.2, 24) }}" alt=""><div>{{ l.batch_code }}</div></figure>{% endif %}
+    {% if l.notes %}<p class="op-note">Uwagi: {{ l.notes }}</p>{% endif %}
+  </section>
+  {% else %}<p class="muted">Zamówienie nie ma pozycji.</p>{% endfor %}
+  <footer class="op-foot">Wydrukowano {{ today|dt }} · {{ order.number }}</footer>
+</div>
+<script src="{{ url_for('static', filename='orders.js') }}" defer></script>
+{% endblock %}

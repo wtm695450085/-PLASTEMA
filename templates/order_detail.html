@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}{{ order.number }} · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Zamówienia{% endblock %}
+{% block content %}
+{% set editable = order.status == 'NOWE' %}
+<div class="form-heading"><div><a class="back" href="{{ url_for('orders_index') }}">← Zamówienia</a>
+  <div class="eyebrow">Zamówienie klienta · {{ order.short_name }} ({{ order.client_code }})</div>
+  <h1>{{ order.number }} <span class="status status-{{ order.status|replace(' ', '-')|lower }}">{{ order.status|lower }}</span></h1>
+  <p class="muted">{{ order.client_name }}{% if order.source_ref %} · numer źródłowy {{ order.source_ref }}{% endif %}{% if order.internal_no %} · zam. produkcyjne {{ order.internal_no }}{% endif %}</p></div>
+  <figure class="barcode-card barcode-card-order"><img src="{{ barcode_uri(order.number, 0.5) }}" alt="Kod kreskowy {{ order.number }}"><figcaption>{{ order.number|replace(' ', '')|replace('ZK', '') }}</figcaption>
+    {% set nb = order.number.split() %}{% if nb|length == 6 %}<small class="barcode-legend">Kod kreskowy numeru zamówienia (Code128)
+    <ul><li><b>{{ nb[1] }}</b> – numer tego klienta</li>
+    <li><b>{{ nb[2] }}{{ nb[3] }}{{ nb[4] }}</b> – data złożenia (RRMMDD)</li>
+    <li><b>{{ nb[5] }}</b> – nr kolejny</li></ul></small>{% endif %}</figure></div>
+
+<ol class="steps">
+  <li class="done"><b>1</b> Kod zamówienia nadany</li>
+  <li class="{{ 'done' if order.status != 'NOWE' else 'now' }}"><b>2</b> Zdolności sprawdzone</li>
+  <li class="{{ 'done' if order.status in ('PRZYJĘTE', 'W PRODUKCJI', 'ZREALIZOWANE') else '' }}"><b>3</b> Data produkcji ustalona</li>
+  <li class="{{ 'done' if order.delivery_date else '' }}"><b>4</b> Data dostawy ustalona</li>
+  <li class="{{ 'done' if order.status in ('W PRODUKCJI', 'ZREALIZOWANE') else '' }}"><b>5</b> Produkcja</li>
+</ol>
+
+<div class="mail-bar">
+  <a class="btn btn-primary" href="{{ url_for('order_print', order_id=order.id) }}" target="_blank">🏷 Wydruk naklejki</a>
+  <a class="btn btn-primary" href="{{ url_for('order_document', order_id=order.id) }}" target="_blank">🖨 Wydruk zamówienia</a>
+  <a class="btn btn-secondary" href="{{ mails.received }}">✉ Informacja o odebraniu zamówienia</a>
+  {% if mails.delivery %}<a class="btn {{ 'btn-primary' if order.status == 'PRZYJĘTE' else 'btn-secondary' }}" href="{{ mails.delivery }}">✉ Informacja o dacie dostawy ({{ delivery|dt }})</a>{% endif %}
+  <span class="muted">Otwiera program pocztowy z gotową treścią do {{ order.ordered_email or order.client_email or 'klienta' }}.</span>
+</div>
+
+{% if order.status in ('PRZYJĘTE', 'W PRODUKCJI', 'ZREALIZOWANE') %}<section class="panel"><h2>Magazyn wyrobów gotowych — wydania do klienta</h2>
+  <div class="table-scroll"><table class="analysis-table fg-orders-table"><thead><tr><th>Lp.</th><th>Produkt</th><th>Klient</th><th class="r">Zamówiono</th><th class="r">Wyprodukowano</th><th>Czas produkcji</th><th>Szarża</th><th class="r">Wydano klientowi</th><th class="r">Pozostało do wydania</th><th class="c">Historia produkcji</th><th class="r">Obecnie na magazynie (cały produkt)</th></tr></thead><tbody>
+  {% for r in rows %}{% set rest = [(r.line.qty or 0) - r.shipped, 0]|max %}{% set over = r.shipped - (r.line.qty or 0) %}<tr><td>{{ r.line.lp }}</td><td>{{ r.line.product_name }}</td><td class="client-cell">{{ order.client_name }}</td><td class="r">{{ r.line.qty|n0 }}</td>
+    <td class="r">{% if r.produced %}{{ r.produced.qty|n0 }}{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td class="nowrap">{% if r.produced and r.produced.start_date %}{{ r.produced.start_date|dt }} – {{ r.produced.end_date|dt if r.produced.end_date else 'w toku' }}{% else %}—{% endif %}</td>
+    <td class="nowrap">{% if r.produced and r.produced.batches %}<span class="code">{{ r.produced.batches }}</span>{% else %}—{% endif %}</td>
+    <td class="r qty">{{ r.shipped|n0 }}{% if over > 0 %}<br><small class="muted">+{{ over|n0 }} ponad zamówienie</small>{% endif %}</td>
+    <td class="r {{ 'minus' if rest > 0 else 'plus' }}">{{ rest|n0 }}</td>
+    <td class="c"><button type="button" class="btn btn-small btn-secondary" data-hist="p{{ r.line.id }}">Produkcja</button></td>
+    <td class="r">{% if r.line.product_id %}<a href="{{ url_for('fg_product', product_id=r.line.product_id) }}">{{ r.fg_stock|n0 }}</a> <button type="button" class="btn btn-small btn-secondary" data-hist="h{{ r.line.id }}">Magazyn</button>{% endif %}</td></tr>
+    <tr class="hist-row hidden" id="p{{ r.line.id }}"><td colspan="11">
+      <strong>Historia produkcji — {{ r.line.product_name }} <span class="muted">(statystyka produkcji 2026)</span></strong>
+      {% for p in r.prod_rows %}<dl class="prod-dl">
+        <div><dt>Produkcja</dt><dd>{{ p.start_date|dt if p.start_date else '—' }} – {{ p.end_date|dt if p.end_date else 'w toku' }}{% if p.start_date and p.end_date %} ({{ (p.end_date - p.start_date).days + 1 }} dn.){% endif %}</dd></div>
+        <div class="span-all"><dt>Zamówienie produkcji</dt><dd>{% if r.zp %}<a href="{{ url_for('settlement_order', order_id=r.zp.id) }}"><span class="code">ZP {{ r.zp.number }}</span></a>
+          z dnia {{ r.zp.order_date|dt }} · wystawił(a): <strong>{{ r.zp.issued_by or '—' }}</strong> · przyjął(ęła) do realizacji: <strong>{{ r.zp.accepted_by or '—' }}</strong>
+          · wtryskarka {{ r.zp.machine_no or '—' }} · <a href="{{ url_for('machine_plan') }}">plan 9 maszyn</a>
+          {% else %}<span class="muted">brak — zlecenie powstaje przy przyjęciu zamówienia do realizacji</span>{% endif %}</dd></div>
+        <div><dt>Kod produkcji</dt><dd>{% if r.production_code %}<span class="code">{{ r.production_code }}</span>{% else %}—{% endif %}</dd></div>
+        <div><dt>Wtryskarka</dt><dd>{{ p.machine_no or '—' }}</dd></div>
+        <div><dt>Wyprodukowano</dt><dd><strong>{{ p.qty|n0 }} szt.</strong>{% if r.line.qty and p.qty is not none and p.qty != r.line.qty %} <span class="muted">(zamówiono {{ r.line.qty|n0 }}, {{ '%+d'|format(p.qty - r.line.qty) }})</span>{% endif %}</dd></div>
+        <div><dt>Szarża</dt><dd>{% if p.batch_code %}<span class="code">{{ p.batch_code }}</span>{% else %}—{% endif %}</dd></div>
+        <div><dt>Cykl / krotność formy</dt><dd>{{ p.cycle_s|num if p.cycle_s else '—' }} s / {{ p.cavities|n0 if p.cavities else '—' }}</dd></div>
+        <div><dt>Śr. na zmianę (8 h)</dt><dd>{{ p.avg_per_shift|n0 if p.avg_per_shift else '—' }} szt.</dd></div>
+        <div><dt>Tworzywo / barwnik</dt><dd>{{ p.material or '—' }} / {{ p.colorant or '—' }}{% if p.dosage_pct %} ({{ p.dosage_pct|num }}%){% endif %}</dd></div>
+        <div><dt>Forma zakładał / zdjął</dt><dd>{{ p.mounted_by or '—' }} / {{ p.dismounted_by or '—' }}</dd></div>
+        {% if p.notes %}<div><dt>Uwagi</dt><dd>{{ p.notes }}</dd></div>{% endif %}
+      </dl>{% else %}<p class="muted">Brak wpisu w statystyce produkcji dla tej pozycji.</p>{% endfor %}
+    </td></tr>
+    <tr class="hist-row hidden" id="h{{ r.line.id }}"><td colspan="11">
+      <strong>Historia w magazynie wyrobów gotowych — {{ r.line.product_name }}{% if r.history_batch %}, szarża <span class="code">{{ r.history_batch }}</span>{% endif %}</strong>
+      {% if r.history %}<table class="analysis-table hist-table"><thead><tr><th>Data</th><th>Operacja</th><th class="r">Ilość</th><th class="r">Saldo szarży</th><th>Dokument</th><th>Lokalizacja</th></tr></thead><tbody>
+        {% for m in r.history %}<tr><td class="nowrap">{{ m.move_date|dt }}</td>
+          <td>{{ {'PW': 'Wejście na magazyn (PW z produkcji)', 'WZ': 'Wyjście do klienta (WZ)', 'ZW': 'Zwrot od klienta (ZW)', 'KOR': 'Korekta inwentaryzacyjna'}[m.move_type] }}{% if m.move_type == 'WZ' and m.zk_number %} · {{ m.zk_number }}{% endif %}</td>
+          <td class="r {{ 'plus' if m.qty > 0 else 'minus' }}">{{ '%+d'|format(m.qty)|replace('+', '+ ')|replace('-', '− ') }}</td><td class="r">{{ m.balance|n0 }}</td>
+          <td>{% if m.doc_id %}<a href="{{ url_for('fg_doc', doc_id=m.doc_id) }}"><span class="code">{{ m.doc_number }}</span></a>{% else %}<span class="muted">{{ 'przyjęcie z rozliczenia produkcji' if m.move_type == 'PW' else '—' }}</span>{% endif %}</td>
+          <td>{{ m.location or '—' }}</td></tr>{% endfor %}
+      </tbody></table>{% else %}<p class="muted">Brak ruchów w magazynie wyrobów dla tej szarży — produkcja jeszcze nie weszła na magazyn.</p>{% endif %}
+    </td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if legacy_shipped %}<p class="muted">Zamówienie historyczne (import z Excela), zrealizowane przed uruchomieniem magazynu wyrobów gotowych — wydanie klientowi odbyło się poza systemem, bez dokumentu WZ.</p>{% endif %}
+  <p class="muted">„Obecnie na magazynie” to obecny stan produktu ze wszystkich szarż (kartoteka magazynu wyrobów od bilansu otwarcia INW-WG/2026/001), nie tylko z tego zamówienia.</p>
+  {% for d in fg_docs %}<p class="open-doc"><a href="{{ url_for('fg_doc', doc_id=d.id) }}"><span class="code">{{ d.number }}</span></a> {{ d.doc_date|dt }} · {{ d.qty|n0 }} szt. · <span class="badge {{ 'badge-material' if d.status == 'ZREALIZOWANY' else 'badge-color' }}">{{ d.status|lower }}</span>{% if d.carrier %} · {{ d.carrier }}{% endif %}</p>{% endfor %}
+  {% if order.status != 'ZREALIZOWANE' %}<form method="post" action="{{ url_for('fg_doc_new') }}" class="form-actions"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="doc_type" value="WZ"><input type="hidden" name="zk" value="{{ order.id }}">
+    <span class="muted">WZ dobierze szarże od najstarszej. Po wydaniu całości zamówienie przejdzie w status „zrealizowane”.</span><span class="spacer"></span><button class="btn btn-primary" type="submit">Wydaj z magazynu — utwórz WZ</button></form>{% endif %}
+</section>{% endif %}
+
+
+
+{% if plan %}
+<section class="verify-summary {{ 'is-error' if plan.errors else ('is-warn' if plan.warns else 'is-ok') }}">
+  <div><span>Weryfikacja zasobów</span><strong>{% if plan.errors %}{{ plan.errors }} poz. blokuje przyjęcie{% elif plan.warns %}{{ plan.warns }} poz. z uwagami{% else %}wszystko dostępne{% endif %}</strong></div>
+  <div><span>Proponowany start</span><strong>{{ plan.start|dt('%d.%m.%Y %H:%M') }}</strong></div>
+  <div><span>Koniec produkcji</span><strong>{{ plan.end|dt('%d.%m.%Y %H:%M') }}</strong></div>
+  <div><span>Możliwa dostawa</span><strong>{{ plan.delivery|dt }}</strong></div>
+</section>
+{% for w in plan.warnings %}<div class="alert alert-error">{{ w }}</div>{% endfor %}
+{% elif order.status in ('PRZYJĘTE', 'W PRODUKCJI') %}
+<section class="verify-summary is-ok">
+  <div><span>Przyjęte</span><strong>{{ order.accepted_at|dt('%d.%m.%Y %H:%M') }}</strong></div>
+  <div><span>Start produkcji</span><strong>{{ order.planned_start|dt('%d.%m.%Y %H:%M') }}</strong></div>
+  <div><span>Koniec produkcji</span><strong>{{ order.planned_end|dt('%d.%m.%Y %H:%M') }}</strong></div>
+  <div><span>Data dostawy</span><strong>{{ order.delivery_date|dt }}</strong></div>
+</section>
+{% endif %}
+
+<form method="post" id="order-form" action="{{ url_for('order_action', order_id=order.id) }}" autocomplete="off">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="visually-hidden" type="submit" name="action" value="save" tabindex="-1" aria-hidden="true">Zapisz</button>
+  <section class="form-section"><div class="form-grid doc-meta">
+    <label>Data złożenia<input type="date" value="{{ order.order_date.isoformat() }}" disabled></label>
+    <label>Żądany termin<input type="date" name="requested_date" value="{{ order.requested_date.isoformat() if order.requested_date else '' }}" {% if not editable %}disabled{% endif %}></label>
+    <label>Kanał<select name="channel" {% if not editable %}disabled{% endif %}>{% for ch in order_channels %}<option {% if order.channel == ch %}selected{% endif %}>{{ ch }}</option>{% endfor %}{% if order.channel and order.channel not in order_channels %}<option selected>{{ order.channel }}</option>{% endif %}</select></label>
+    <label>Odebrał(a)<select name="received_by" {% if not editable %}disabled{% endif %}><option value="">{{ 'brak danych (zamówienie z importu)' if order.source_ref and not editable and not order.received_by else '—' }}</option>{% for r in order_receivers %}<option {% if order.received_by == r %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+    <label>Osoba zamawiająca<input name="ordered_by" value="{{ order.ordered_by or '' }}" {% if not editable %}disabled{% endif %}></label>
+    <label>E-mail zamawiającego<input name="ordered_email" value="{{ order.ordered_email or '' }}" {% if not editable %}disabled{% endif %}></label>
+    <label>Numer zamówienia klienta<input name="client_ref" value="{{ order.client_ref or '' }}" {% if not editable %}disabled{% endif %}></label>
+    <label>Uwagi<input name="notes" value="{{ order.notes or '' }}"{% if order.source_ref and not order.notes %} placeholder="brak uwag w źródłowym Excelu"{% endif %} {% if not editable %}disabled{% endif %}></label>
+  </div></section>
+
+  {% for r in rows %}{% set l = r.line %}{% set p = r.plan %}
+  <section class="order-line {{ 'level-' ~ p.level if p else '' }}">
+    <header class="order-line-head">
+      <span class="sec-tag">{{ l.lp }}</span>
+      <div class="order-line-title"><strong>{{ l.product_name }}</strong>
+        <small>{% if l.product_code %}produkt <a href="{{ url_for('product_form', product_id=l.product_id) }}">{{ '%04d'|format(l.product_code) }}</a>{% else %}brak w bazie produktów{% endif %}
+        {% if p and p.new_pair is not none %} · <span class="badge {{ 'badge-color' if p.new_pair else 'badge-material' }}">{{ 'nowa para' if p.new_pair else 'stara para' }}</span>{% elif l.is_new_pair is not none %} · <span class="badge {{ 'badge-color' if l.is_new_pair else 'badge-material' }}">{{ 'nowa para' if l.is_new_pair else 'stara para' }}</span>{% endif %}</small></div>
+      <div class="order-line-qty">{% if editable %}<label>Ilość szt.<input class="qty-input" name="qty_{{ l.id }}" value="{{ l.qty or '' }}" inputmode="numeric"></label>
+        <label>Kolor<select name="color_{{ l.id }}"><option value="">—</option>{% for col in colors %}<option value="{{ col.id }}" {% if l.color_id == col.id %}selected{% endif %}>{{ col.code }} {{ col.name }}</option>{% endfor %}</select></label>
+        <label>Uwagi<input class="note-input" name="note_{{ l.id }}" value="{{ l.notes or '' }}"></label>
+        <button class="btn btn-small btn-danger" type="submit" name="action" value="delete_line:{{ l.id }}" data-confirm="Usunąć pozycję {{ l.lp }}?">Usuń</button>
+        {% else %}<strong>{{ l.qty|n0 }} szt.</strong><small>{{ l.color_code or '—' }} {{ l.color_name or '' }}</small>{% if l.notes %}<small>{{ l.notes }}</small>{% endif %}{% endif %}</div>
+    </header>
+
+    <div class="codes-row">
+      {% if r.production_code %}
+      <figure class="code-box code-prod"><span>Kod produkcji AAA-BBBB-CCC</span><strong>{{ r.production_code }}</strong><img src="{{ barcode_uri(r.production_code) }}" alt=""><small>{{ r.production_code|replace('-', '') }}</small></figure>
+      <figure class="code-box code-full"><span>Pełny kod AAA-BBBB-CCC-EEE-FFF-GGG</span><strong>{{ r.full_code }}</strong><img src="{{ barcode_uri(r.full_code) }}" alt=""><small>{{ r.full_code|replace('-', '') }}</small></figure>
+      {% endif %}
+      {% set bc = l.batch_code or (r.produced.batches if r.produced and r.produced.batches and ',' not in r.produced.batches else '') %}
+      {% if bc %}<figure class="code-box code-batch"><span>Kod szarży produkcji N-Z-S-DDMMRR</span><strong>{{ bc }}</strong><img src="{{ barcode_uri(bc) }}" alt=""><small>{{ bc|replace('-', '') }}</small></figure>{% endif %}
+      <dl class="resource-list">
+        <div><dt>EEE forma</dt><dd>{% if l.mold_no %}<a href="{{ url_for('mold_passport', mold_id=l.mold_id) }}">{{ l.mold_no }}</a> {{ l.mold_name }}{% if l.mold_match == 'AUTO' %} <span class="badge badge-color">do weryfikacji</span>{% endif %}{% else %}—{% endif %}</dd></div>
+        <div><dt>FFF tworzywo</dt><dd>{{ l.material_index or '—' }} {{ l.material_name or l.material_text or '' }}</dd></div>
+        <div><dt>GGG barwnik</dt><dd>{{ l.colorant_index or '—' }} {{ l.colorant_symbol or l.colorant_text or '' }}{% if l.colorant_pct and l.colorant_index %} · {{ l.colorant_pct|num }}%{% endif %}</dd></div>
+        {% set kg = p.material_kg if p else l.material_kg %}{% set ckg = p.colorant_kg if p else l.colorant_kg %}
+        <div><dt>Zapotrzebowanie</dt><dd>{% if kg is not none %}{{ kg|num }} kg tworzywa{% if ckg %} + {{ ckg|num }} kg barwnika{% endif %}{% else %}—{% endif %}</dd></div>
+        {% set m = p.machine if p else l.machine_no %}{% set st = r.produced %}
+        <div><dt>Wtryskarka</dt><dd>{% if not p and st and st.machines %}<strong>Maszyna {{ st.machines }}</strong> · produkcja {{ st.start_date|dt }} – {{ st.end_date|dt if st.end_date else 'w toku' }}{% elif m %}<strong>Maszyna {{ m }}</strong> · {{ (p.start if p else l.planned_start)|dt('%d.%m %H:%M') }} → {{ (p.end if p else l.planned_end)|dt('%d.%m %H:%M') }}{% elif l.prod_start %}produkcja {{ l.prod_start|dt }} – {{ l.prod_end|dt }}{% else %}—{% endif %}</dd></div>
+      </dl>
+    </div>
+
+    {% if p %}<ul class="check-list">{% for c in p.checks %}<li class="check-{{ c.level }}"><b>{{ c.title }}</b> {{ c.text }}</li>{% endfor %}</ul>{% endif %}
+  </section>
+  {% else %}<div class="empty panel">Zamówienie nie ma pozycji.</div>{% endfor %}
+
+  {% if editable %}
+  <section class="add-line-row add-order-line">
+    <datalist id="order-products">{% for p in products %}<option value="{{ '%04d'|format(p.code) }} {{ p.name }}"></option>{% endfor %}</datalist>
+    <label class="search">Dodaj pozycję — produkt<input list="order-products" name="add_product" placeholder="kod lub nazwa produktu {{ order.short_name }}"></label>
+    <label>Ilość szt.<input class="qty-input" name="add_qty" inputmode="numeric"></label>
+    <button class="btn btn-secondary" type="submit" name="action" value="add_line">+ Dodaj pozycję</button>
+    <a class="clear" href="{{ url_for('product_form', klient=order.client_id) }}">+ nowy produkt</a>
+  </section>
+  <div class="save-bar">
+    <button class="btn btn-danger" type="submit" name="action" value="delete" data-confirm="Usunąć zamówienie {{ order.number }}?">Usuń</button>
+    <span class="spacer"></span>
+    <button class="btn" type="submit" name="action" value="save">Zapisz i przelicz</button>
+    <button class="btn btn-primary btn-done" type="submit" name="action" value="accept" {% if plan and plan.errors %}disabled title="Najpierw usuń błędy blokujące"{% endif %}>Przyjmij do realizacji — zarezerwuj surowce i maszyny</button>
+  </div>
+  {% endif %}
+</form>
+
+{% if order.status == 'PRZYJĘTE' %}
+<div class="save-bar">
+  <form method="post" action="{{ url_for('order_action', order_id=order.id) }}" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn" type="submit" name="action" value="unaccept" data-confirm="Cofnąć przyjęcie? Rezerwacje i terminy zostaną zwolnione.">Cofnij przyjęcie</button>
+    <button class="btn btn-danger" type="submit" name="action" value="cancel" data-confirm="Anulować zamówienie {{ order.number }}?">Anuluj</button></form>
+  <span class="spacer"></span>
+  <form method="post" action="{{ url_for('settlement_from_zk', zk_id=order.id) }}" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-primary btn-done" type="submit">Przekaż do produkcji — rozpocznij realizację zamówień produkcji</button></form>
+</div>
+{% elif order.status == 'W PRODUKCJI' %}
+<form method="post" class="save-bar" action="{{ url_for('order_action', order_id=order.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="btn btn-danger" type="submit" name="action" value="cancel" data-confirm="Anulować zamówienie w produkcji?">Anuluj</button>
+  <a class="btn btn-secondary" href="{{ url_for('machines_index') }}">Wydaj surowiec na maszynę (WM)</a>
+  <a class="btn btn-secondary" href="{{ url_for('settlement_index') }}">Rozliczenie produkcji</a>
+  <span class="spacer"></span>
+  <button class="btn btn-primary btn-done" type="submit" name="action" value="finish" data-confirm="Oznaczyć zamówienie jako zrealizowane?">Zrealizowane</button>
+</form>
+{% endif %}
+<script src="{{ url_for('static', filename='orders.js') }}" defer></script>
+{% endblock %}

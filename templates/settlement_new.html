@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Nowe zamówienie produkcji · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Rozliczenie produkcji{% endblock %}
+{% block content %}
+<div class="form-heading"><div><a class="back" href="{{ url_for('settlement_index') }}">← Rozliczenie produkcji</a><div class="eyebrow">Etap 1 — planowanie w biurze</div>
+  <h1>Nowe zamówienie produkcji <span class="code">{{ number }}</span></h1>
+  <p class="muted">Jedno zamówienie produkcji = jeden produkt, jedna maszyna, jedna forma. Kolory rozpisuje specyfikacja — ich suma musi równać się ilości zamówienia (K1).</p></div></div>
+<form method="get" class="filters">
+  <label class="search"><span>Klient</span><select name="klient" required><option value="">— wybierz klienta —</option>{% for c in clients %}<option value="{{ c.id }}" {% if client_id == c.id %}selected{% endif %}>{{ c.code }} · {{ c.short_name }}</option>{% endfor %}</select></label>
+  <button class="btn btn-secondary" type="submit">{{ 'Zmień klienta' if client_id else 'Dalej' }}</button>
+</form>
+{% if client_id %}
+<form method="post" class="supplier-form" autocomplete="off"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="klient" value="{{ client_id }}">
+  {% with o=form, editable=True %}{% include '_prod_order_header.html' %}{% endwith %}
+  <section class="form-section"><h2>Specyfikacja do zamówienia (dok. 3) — kolory</h2>
+    <p class="muted">Wybierz wariant produktu z bazy (podpowie kolor, barwnik i dozowanie) albo sam kolor i barwnik. Puste pola koloru i barwnika = z karty produktu.</p>
+    <datalist id="variants">{% for p in products %}<option value="{{ '%04d'|format(p.code) }} {{ p.name }}"></option>{% endfor %}</datalist>
+    <div class="table-scroll"><table class="order-lines-table"><thead><tr><th>Lp.</th><th>Wariant produktu (BBBB)</th><th>Kolor (CCC)</th><th>Barwnik (BT)</th><th class="r">Dozowanie %</th><th class="r">Ilość zamówiona</th></tr></thead><tbody>
+    {% for i in range(1, 13) %}<tr><td class="num">{{ i }}</td>
+      <td><input list="variants" name="variant_{{ i }}" value="{{ form['variant_' ~ i] or '' }}"></td>
+      <td><select name="color_{{ i }}"><option value="">z wariantu</option>{% for c in colors %}<option value="{{ c.id }}" {% if form['color_' ~ i] == c.id|string %}selected{% endif %}>{{ c.code }} {{ c.name }}</option>{% endfor %}</select></td>
+      <td><select name="colorant_{{ i }}"><option value="">z wariantu</option>{% for b in bt %}<option value="{{ b.id }}" {% if form['colorant_' ~ i] == b.id|string %}selected{% endif %}>{{ b.material_index }} {{ b.symbol }} {{ b.color or '' }}</option>{% endfor %}</select></td>
+      <td><input class="qty-input" name="dosage_{{ i }}" value="{{ form['dosage_' ~ i] or '' }}" inputmode="decimal"></td>
+      <td><input class="qty-input" name="qty_{{ i }}" value="{{ form['qty_' ~ i] or '' }}" inputmode="numeric"></td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  <div class="form-actions"><span class="spacer"></span><a class="btn btn-ghost" href="{{ url_for('settlement_index') }}">Anuluj</a><button class="btn btn-primary" type="submit">Utwórz zamówienie produkcji</button></div>
+</form>
+{% endif %}
+{% endblock %}

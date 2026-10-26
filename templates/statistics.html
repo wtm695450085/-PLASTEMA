@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Statystyka produkcji · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Rozliczenie produkcji{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Dok. 6 · jeden wiersz = jeden kolor jednego zamówienia produkcji</div><h1>Statystyka produkcji</h1>
+  <p class="muted">Historia z „2026 RAPORT_PRODUKCYJNY-STATYSTYKA” + wiersze dopisywane przy rozliczeniu koloru. Kody: szarża N-Z-S-DDMMRR, produkt BBBB, forma EEE.</p></div>
+  <div class="head-actions"><a class="btn btn-secondary" href="{{ url_for('stats_xlsx', **args.to_dict(flat=False)) }}">Pobierz Excel (układ arkusza)</a><a class="btn" href="{{ url_for('stats_csv', **args.to_dict(flat=False)) }}">CSV</a></div></section>
+
+<form method="get" class="filters stats-filters">
+  <label class="client-multi">Klient (Ctrl — kilku)<select name="klient" multiple size="5">{% for c in clients %}<option value="{{ c.code }}" {% if c.code in selected %}selected{% endif %}>{{ c.code }} · {{ c.short_name }} ({{ c.n }})</option>{% endfor %}</select></label>
+  <div class="stats-grid">
+    <label>Kod szarży<input name="szarza" value="{{ args.get('szarza','') }}" placeholder="np. 1-1-1-090926"></label>
+    <label>Kod produktu BBBB<input name="kod_produktu" value="{{ args.get('kod_produktu','') }}"></label>
+    <label>Forma EEE<input name="forma" value="{{ args.get('forma','') }}"></label>
+    <label>Produkt<input name="q" value="{{ args.get('q','') }}" placeholder="np. lollipop"></label>
+    <label>Zam. prod.<input name="zam" value="{{ args.get('zam','') }}" placeholder="np. 296/2026"></label>
+    <label>Tworzywo<input name="tworzywo" value="{{ args.get('tworzywo','') }}"></label>
+    <label>Barwnik<input name="barwnik" value="{{ args.get('barwnik','') }}"></label>
+    <label>Wzór<input name="wzor" value="{{ args.get('wzor','') }}" placeholder="26/09-B"></label>
+    <label>Maszyna<select name="maszyna"><option value="">wszystkie</option>{% for m in range(1, 10) %}<option {% if args.get('maszyna') == m|string %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></label>
+    <label>Źródło<select name="zrodlo"><option value="">wszystkie</option><option value="EXCEL" {% if args.get('zrodlo') == 'EXCEL' %}selected{% endif %}>import z Excela</option><option value="ROZLICZENIE" {% if args.get('zrodlo') == 'ROZLICZENIE' %}selected{% endif %}>rozliczenie w systemie</option></select></label>
+    <label>Start od<input type="date" name="od" value="{{ args.get('od','') }}"></label>
+    <label>Start do<input type="date" name="do" value="{{ args.get('do','') }}"></label>
+  </div>
+  <input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="dir" value="{{ direction }}">
+  <div class="form-actions"><button class="btn btn-primary" type="submit">Filtruj</button><a class="clear" href="{{ url_for('stats_index') }}">Wyczyść</a></div>
+</form>
+
+<div class="stat-grid">
+  <div class="stat-card"><span>Wierszy (kolorów)</span><strong>{{ stats.n }}</strong><small>{{ stats.orders }} zamówień prod.</small></div>
+  <div class="stat-card"><span>Dobre sztuki</span><strong>{{ stats.qty|n0 }}</strong><small>{{ stats.products }} produktów · {{ stats.clients }} klientów</small></div>
+  <div class="stat-card"><span>Braki</span><strong>{{ stats.scrap|n0 }}</strong><small>szt. (kolumna braków to sztuki, nie %)</small></div>
+</div>
+
+<div class="table-card"><div class="table-scroll"><table class="stats-table"><thead><tr>
+{% for key, label, _ in columns %}<th><a class="sort-link" href="{{ stats_url(sort=key, dir=('desc' if sort == key and direction == 'asc' else 'asc'), strona=None) }}">{{ label }}{% if sort == key %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>{% endfor %}
+</tr></thead><tbody>
+{% for r in rows %}<tr>
+  <td><span class="code">{{ r.batch_code or '—' }}</span></td><td><span class="code client-code">{{ r.client_code }}</span> {{ r.client_name }}</td>
+  <td>{% if r.product_code %}<a href="{{ url_for('product_form', product_id=r.product_id) }}"><span class="code">{{ '%04d'|format(r.product_code) }}</span></a>{% else %}—{% endif %}</td>
+  <td><strong>{{ r.product_name }}</strong>{% if r.production_code %}<small>{{ r.full_code }}</small>{% endif %}</td>
+  <td>{{ r.start_date|dt }}</td><td>{{ r.end_date|dt }}</td>
+  <td>{% if r.prod_color_id %}<a href="{{ url_for('settlement_color', color_id=r.prod_color_id) }}">{{ r.internal_order }}</a>{% else %}{{ r.internal_order or '' }}{% endif %}</td>
+  <td class="r">{{ r.machine_no or '' }}</td><td class="r qty">{{ r.qty|n0 }}</td><td class="r">{{ r.scrap_pcs|n0 if r.scrap_pcs is not none else '' }}</td>
+  <td class="r">{{ r.cycle_s|num if r.cycle_s else '' }}</td><td class="r">{{ r.avg_per_shift|n0 if r.avg_per_shift else '' }}</td><td class="r">{{ r.cavities|n0 if r.cavities else '' }}</td>
+  <td class="r">{{ r.net_g|num if r.net_g else '' }}</td><td class="r">{{ r.shot_g|num if r.shot_g else '' }}</td>
+  <td>{% if r.row_mold_id %}<a href="{{ url_for('mold_passport', mold_id=r.row_mold_id) }}">{{ r.mold_no }}</a>{% else %}—{% endif %}</td>
+  <td><small>{{ r.material or '' }}</small></td><td>{{ r.colorant or '' }}</td><td class="r">{{ r.dosage_pct|num if r.dosage_pct is not none else '' }}</td>
+  <td>{{ r.pattern_no or '' }}</td><td><span class="badge {{ 'badge-material' if r.source == 'ROZLICZENIE' else 'badge-color' }}">{{ 'rozliczenie' if r.source == 'ROZLICZENIE' else 'Excel' }}</span></td>
+</tr>{% else %}<tr><td colspan="{{ columns|length }}" class="empty">Brak wyników dla wybranych filtrów.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% if pages > 1 %}<nav class="pager">{% if page > 1 %}<a class="btn btn-small" href="{{ stats_url(strona=page-1) }}">← Poprzednia</a>{% endif %}<span>Strona {{ page }} z {{ pages }}</span>{% if page < pages %}<a class="btn btn-small" href="{{ stats_url(strona=page+1) }}">Następna →</a>{% endif %}</nav>{% endif %}
+<p class="muted catalog-hint">Dla historii z Excela zmiana startu nie jest zapisana — w kodzie szarży przyjęto Z = 1. Wagi są w gramach.</p>
+{% endblock %}

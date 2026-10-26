@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Zużycie materiałów · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Rozliczenie produkcji{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">K11 · magazyn materiałów sypkich</div><h1>Zużycie materiału a ubytek w inwenturze</h1>
+  <p class="muted">Ubytek = stan poprzedni + dostawy − stan obecny. Zużycie produkcji = Σ cykle × waga brutto wtrysku × (1 − dozowanie barwnika) dla wyrobów zakończonych w okresie. Duża różnica = błąd w inwenturze albo nierozliczona produkcja.</p></div></section>
+<form class="filters" method="get">
+  <label><span>Od inwentury</span><select name="od">{% for i in inventories %}<option value="{{ i.id }}" {% if a == i.id %}selected{% endif %}>{{ i.number }} · {{ i.count_date|dt }}</option>{% endfor %}</select></label>
+  <label><span>Do inwentury</span><select name="do">{% for i in inventories %}<option value="{{ i.id }}" {% if b == i.id %}selected{% endif %}>{{ i.number }} · {{ i.count_date|dt }}</option>{% endfor %}</select></label>
+  <button class="btn btn-secondary" type="submit">Policz</button>
+</form>
+{% if inv_a and inv_b and inv_a.count_date < inv_b.count_date %}
+<div class="table-card"><div class="table-scroll"><table><thead><tr><th>Tworzywo</th><th class="r">Stan {{ inv_a.count_date|dt('%d.%m') }} kg</th><th class="r">Dostawy kg</th><th class="r">Stan {{ inv_b.count_date|dt('%d.%m') }} kg</th><th class="r">Ubytek kg</th><th class="r">Zużycie produkcji kg</th><th class="r">Pokrycie</th><th class="r">Różnica kg</th><th></th></tr></thead><tbody>
+{% for r in rows %}<tr class="{{ 'row-missing' if r.flag else '' }}">
+  <td><span class="code material-code">{{ r.material_index }}</span> {{ r.name }}</td>
+  <td class="r">{{ r.kg_a|num if r.kg_a is not none else '—' }}</td><td class="r">{{ r.delivered|num if r.delivered else '' }}</td><td class="r">{{ r.kg_b|num if r.kg_b is not none else '—' }}</td>
+  <td class="r qty">{{ r.loss|num if r.loss is not none else '—' }}</td>
+  <td class="r qty">{{ r.used|num if r.used else '—' }}{% if r.incomplete %}<small>{{ r.incomplete }} wierszy bez wagi/cykli</small>{% endif %}</td>
+  <td class="r">{{ r.pct|int ~ '%' if r.pct is not none else '' }}</td>
+  <td class="r {{ 'minus' if r.diff is not none and r.diff < 0 else '' }}">{{ r.diff|num if r.diff is not none else '—' }}</td>
+  <td class="actions">{% if r.used %}<a class="btn btn-small" href="{{ url_for('material_consumption', od=a, do=b, material=r.id) }}#szczegoly">Wyroby</a>{% endif %}</td>
+</tr>{% else %}<tr><td colspan="9" class="empty">Brak danych w tym okresie.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% if detail %}<section class="panel" id="szczegoly"><h2>Wyroby z tego tworzywa zakończone {{ inv_a.count_date|dt('%d.%m') }} – {{ inv_b.count_date|dt('%d.%m') }}</h2>
+  <div class="table-scroll"><table class="analysis-table"><thead><tr><th>Koniec</th><th>Klient</th><th>Produkt</th><th>Zam.</th><th class="r">Dobre</th><th class="r">Braki</th><th class="r">Cykle</th><th class="r">Wtrysk g</th><th class="r">Doz. %</th><th class="r">Zużycie kg</th></tr></thead><tbody>
+  {% for d in detail %}<tr><td>{{ d.end_date|dt }}</td><td>{{ d.short_name }}</td><td>{{ d.product_name }}</td><td>{{ d.internal_order }}</td><td class="r">{{ d.qty|n0 }}</td><td class="r">{{ d.scrap_pcs|n0 if d.scrap_pcs is not none else '' }}</td>
+    <td class="r">{{ d.cycles_calc|n0 }}{% if d.cycles is none %}<small>z dobrych + braków</small>{% endif %}</td><td class="r">{{ d.shot_g|num if d.shot_g else '—' }}</td><td class="r">{{ d.dosage_pct|num if d.dosage_pct is not none else '' }}</td><td class="r qty">{{ d.kg|num if d.kg else '—' }}</td></tr>{% endfor %}
+  <tr class="total-row"><td colspan="9"><strong>Razem</strong></td><td class="r"><strong>{{ detail|selectattr('kg')|sum(attribute='kg')|num }}</strong></td></tr>
+  </tbody></table></div><p class="muted catalog-hint">Wyrób zaliczany jest do okresu wg daty zakończenia koloru. Kolor trwający przez granicę okresu wlicza się w całości do okresu, w którym się skończył.</p></section>{% endif %}
+{% else %}<div class="alert alert-error">Wybierz dwie zatwierdzone inwentury — pierwsza musi być wcześniejsza.</div>{% endif %}
+{% endblock %}

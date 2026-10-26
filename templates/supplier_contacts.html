@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Kontakty · {{ supplier.short_name or supplier.name }} · Plastema{% endblock %}
+{% block content %}
+<div class="form-heading"><div><a class="back" href="{{ url_for('index', material=supplier.material_type) }}">← Dostawcy {{ 'barwników' if supplier.material_type == 'BARWNIK' else 'tworzyw' }}</a>
+  <div class="eyebrow">Osoby kontaktowe</div><h1>{{ supplier.name }}</h1>
+  <p class="muted"><span class="code">{{ supplier.supplier_no or 'bez numeru' }}</span> · {{ contacts|length }} {{ 'osoba kontaktowa' if contacts|length == 1 else 'osób kontaktowych' }}{% if supplier.phone %} · tel. firmy: <a class="contact-link" href="tel:{{ supplier.phone|replace(' ', '') }}">{{ supplier.phone }}</a>{% endif %}</p></div></div>
+
+<div class="contact-sheet">
+{% for c in contacts %}
+  <article class="contact-print">
+    <header><h2>{{ c.contact_name or 'Osoba bez nazwiska' }}</h2>{% if c.position %}<span class="contact-position">{{ c.position }}</span>{% endif %}
+      <a class="btn btn-small" href="{{ url_for('edit_contact', contact_id=c.id) }}">Edytuj</a></header>
+    <dl>
+      <div><dt>Telefon</dt><dd>{% if c.phone %}<a class="contact-link" href="tel:{{ c.phone|replace(' ', '') }}">{{ c.phone }}</a>{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+      <div><dt>E-mail</dt><dd>{% if c.email %}<a class="contact-link" href="mailto:{{ c.email }}">{{ c.email }}</a>{% else %}<span class="muted">—</span>{% endif %}</dd></div>
+      {% if c.notes %}<div class="contact-notes"><dt>Uwagi</dt><dd>{{ c.notes }}</dd></div>{% endif %}
+    </dl>
+  </article>
+{% else %}
+  <p class="empty">Ten dostawca nie ma jeszcze żadnej osoby kontaktowej.</p>
+{% endfor %}
+</div>
+
+<p class="add-contact"><a class="btn btn-small btn-secondary" href="{{ url_for('create_contact', supplier_id=supplier.id) }}">+ Dodaj osobę kontaktową</a></p>
+{% endblock %}

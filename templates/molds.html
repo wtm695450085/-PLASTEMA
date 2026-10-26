@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Formy wtryskowe · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Formy wtryskowe{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Ewidencja form · paszporty · kod EEE</div><h1>Formy wtryskowe</h1>
+  <p class="muted">Każda forma ma kod EEE, który trafia do pełnego kodu produkcji AAA-BBBB-CCC-<b>EEE</b>-FFF-GGG. Kliknij formę, żeby otworzyć jej paszport.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('mold_form') }}">+ Nowa forma (nadaj kod)</a></section>
+<div class="stat-grid">{% for s in mold_statuses %}<a class="stat-card {{ 'stat-warn' if s in ('W NAPRAWIE', 'W PRZEGLĄDZIE') and counts.get(s) else '' }}" href="{{ url_for('molds_index', status=s) }}"><span>{{ s }}</span><strong>{{ counts.get(s, 0) }}</strong><small>form</small></a>{% endfor %}</div>
+<form class="filters" method="get">
+  <label class="search"><span>Szukaj</span><input name="q" value="{{ query }}" placeholder="kod EEE, nazwa, klient, nr rysunku, pole"></label>
+  <label><span>Status</span><select name="status"><option value="">Wszystkie</option>{% for s in mold_statuses %}<option {% if status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>
+  <label><span>Pokaż</span><select name="flaga"><option value="">wszystkie</option><option value="przeglad" {% if flag == 'przeglad' %}selected{% endif %}>wymagające przeglądu</option><option value="nieuzywane" {% if flag == 'nieuzywane' %}selected{% endif %}>bez użyć w produkcji</option><option value="bez-produktow" {% if flag == 'bez-produktow' %}selected{% endif %}>bez przypisanych produktów</option></select></label>
+  <label><span>Sortuj</span><select name="sort"><option value="">po kodzie EEE</option><option value="uzycie" {% if sort == 'uzycie' %}selected{% endif %}>ostatnio używane</option></select></label>
+  <button class="btn btn-secondary" type="submit">Filtruj</button>{% if query or status or flag or sort %}<a class="clear" href="{{ url_for('molds_index') }}">Wyczyść</a>{% endif %}
+</form>
+<div class="table-card"><div class="table-scroll"><table><thead><tr><th></th><th>EEE</th><th>Forma</th><th>Klient</th><th class="r">Gniazda</th><th>Pole</th><th>Status</th><th>Ostatnie użycie</th><th class="r">Użyć</th><th class="r">Wyprodukowano szt.</th><th class="r">Licznik cykli</th><th>Produkty</th></tr></thead><tbody>
+{% for r in rows %}{% set m = r.m %}<tr class="{{ 'row-missing' if m.status != 'SPRAWNA' else '' }}">
+  <td class="thumb-cell">{% if m.photo_slot %}<img class="mold-thumb" src="{{ url_for('mold_photo', mold_id=m.id, slot=m.photo_slot, mini=1) }}" alt="" loading="lazy">{% else %}<span class="mold-thumb empty-thumb">brak zdjęcia</span>{% endif %}</td>
+  <td><a href="{{ url_for('mold_passport', mold_id=m.id) }}"><span class="code mold-code">{{ m.mold_no }}</span></a></td>
+  <td><a class="row-link" href="{{ url_for('mold_passport', mold_id=m.id) }}"><strong>{{ m.name }}</strong></a><small>{{ m.mold_type or '' }}{% if m.runner %} · {{ m.runner }}{% endif %}</small></td>
+  <td>{{ m.client_name or '—' }}</td><td class="r">{{ m.cavities or '—' }}</td><td>{{ m.storage or '—' }}</td>
+  <td><span class="status mold-{{ m.status|replace(' ', '-')|lower }}">{{ m.status|lower }}</span>{% if r.due %}<small class="minus">przegląd!</small>{% endif %}{% if m.busy_until and m.busy_until.date() >= today %}<small>zajęta do {{ m.busy_until|dt('%d.%m') }}</small>{% endif %}</td>
+  <td>{{ r.s.last_used|dt }}</td><td class="r">{{ r.s.uses or 0 }}</td><td class="r">{{ r.s.qty|n0 if r.s.qty else '—' }}</td><td class="r">{{ r.counter|n0 if r.counter else '—' }}</td>
+  <td>{{ m.products or 0 }}</td>
+</tr>{% else %}<tr><td colspan="12" class="empty">Brak form.</td></tr>{% endfor %}
+</tbody></table></div></div>
+<p class="muted catalog-hint">Licznik cykli = licznik przy wprowadzeniu + ilość wyprodukowana ÷ liczba gniazd (z historii zamówień).</p>
+{% endblock %}

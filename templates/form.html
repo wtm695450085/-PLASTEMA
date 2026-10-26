@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · Magazyn surowców{% endblock %}
+{% block content %}
+<div class="form-heading"><div><a class="back" href="{{ url_for('index') }}">← Wróć do listy</a><h1>{{ title }}</h1></div></div>
+<form method="post" class="supplier-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <section class="form-section"><h2>Dane podstawowe</h2><div class="form-grid">
+    <label class="span-2">Nazwa dostawcy *<input name="name" value="{{ supplier.name or '' }}" required></label><label>Nazwa skrócona<input name="short_name" value="{{ supplier.short_name or '' }}"></label>
+    <label>Nr dostawcy<input name="supplier_no" value="{{ supplier.supplier_no or '' }}" placeholder="np. DT025"></label><label>Lp.<input type="number" min="1" name="ordinal" value="{{ supplier.ordinal or '' }}"></label>
+    <label>Rodzaj surowca<select name="material_type">{% set selected_type = supplier.material_type or 'TWORZYWO' %}{% for option in ['TWORZYWO', 'BARWNIK', 'INNE'] %}<option {% if option == selected_type %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+  </div></section>
+  <section class="form-section"><h2>Adres</h2><div class="form-grid">
+    <label class="span-2">Adres<input name="address" value="{{ supplier.address or '' }}"></label><label>Kod pocztowy<input name="postal_code" value="{{ supplier.postal_code or '' }}"></label>
+    <label>Miasto<input name="city" value="{{ supplier.city or '' }}"></label><label>Kraj<input name="country" value="{{ supplier.country or '' }}"></label><label>NIP<input name="nip" value="{{ supplier.nip or '' }}" inputmode="numeric"></label>
+  </div></section>
+  <section class="form-section"><h2>Kontakt ogólny i rozliczenia</h2><div class="form-grid">
+    <label>Nr tel. ogólny<input name="phone" value="{{ supplier.phone or '' }}" type="tel"></label><label>Strona internetowa<input name="website" value="{{ supplier.website or '' }}"></label>
+    <label>Warunki płatności<input name="payment_terms" value="{{ supplier.payment_terms or '' }}" placeholder="np. 30 dni"></label><label class="span-2">Uwagi<textarea name="notes" rows="4">{{ supplier.notes or '' }}</textarea></label>
+  </div></section>
+  <div class="form-actions">{% if supplier.id %}<button class="btn btn-danger" type="button" data-delete-form="delete-form">Usuń dostawcę</button>{% endif %}<span class="spacer"></span><a class="btn btn-ghost" href="{{ url_for('index') }}">Anuluj</a><button class="btn btn-primary" type="submit">Zapisz dostawcę</button></div>
+</form>
+{% if supplier.id %}
+<section class="form-section contacts-section" id="contacts">
+  <div class="section-head"><div><h2>Osoby kontaktowe</h2><p class="muted">Powiązane z dostawcą {{ supplier.supplier_no or supplier.name }}.</p></div><a class="btn btn-secondary" href="{{ url_for('create_contact', supplier_id=supplier.id) }}">+ Dodaj osobę</a></div>
+  <div class="contact-grid">{% for c in contacts %}<article class="contact-card"><div class="contact-avatar">{{ (c.contact_name or c.email or '?')[0]|upper }}</div><div class="contact-body">
+    <strong>{{ c.contact_name or 'Nie podano nazwiska' }}</strong>{% if c.position %}<small class="position">{{ c.position }}</small>{% endif %}{% if c.phone %}<a href="tel:{{ c.phone }}">{{ c.phone }}</a>{% endif %}{% if c.email %}<a href="mailto:{{ c.email }}">{{ c.email }}</a>{% endif %}{% if c.notes %}<small>{{ c.notes }}</small>{% endif %}
+  </div><a class="btn btn-small" href="{{ url_for('edit_contact', contact_id=c.id) }}">Edytuj</a></article>{% else %}<div class="empty-contact">Brak osób kontaktowych dla tego dostawcy.</div>{% endfor %}</div>
+</section>
+<form id="delete-form" method="post" action="{{ url_for('delete_supplier', supplier_id=supplier.id) }}" hidden><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>
+{% endif %}
+{% endblock %}

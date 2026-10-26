@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ client.short_name or 'Nowy klient' }} · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Zamówienia{% endblock %}
+{% block content %}
+<div class="form-heading"><div><a class="back" href="{{ url_for('clients_index') }}">← Klienci</a><h1>{{ client.short_name if client_id else 'Nowy klient' }}</h1>
+  {% if client_id %}<p class="muted">{{ products }} produktów · <a href="{{ url_for('order_new', klient=client_id) }}">+ nowe zamówienie tego klienta</a></p>{% endif %}</div></div>
+<form method="post" class="supplier-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<section class="form-section"><h2>Identyfikacja</h2><div class="form-grid">
+  <label>Kod klienta AAA *<input name="code" value="{{ client.code or '' }}" maxlength="3" pattern="[0-9]{3}" required></label>
+  <label>Nazwa skrócona *<input name="short_name" value="{{ client.short_name or '' }}" required placeholder="np. FIBOO"></label>
+  <label class="span-2">Pełna nazwa firmy *<input name="name" value="{{ client.name or '' }}" required></label>
+  <label>Branża<input name="industry" value="{{ client.industry or '' }}"></label>
+  <label>Współpraca od<input type="date" name="since" value="{{ client.since.isoformat() if client.since and client.since.isoformat is defined else (client.since or '') }}"></label>
+</div></section>
+<section class="form-section"><h2>Kontakt</h2><div class="form-grid">
+  <label>Osoba kontaktowa<input name="contact_person" value="{{ client.contact_person or '' }}"></label>
+  <label>Stanowisko<input name="contact_position" value="{{ client.contact_position or '' }}"></label>
+  <label>Telefon (kontakt)<input name="phone" value="{{ client.phone or '' }}"></label>
+  <label>Telefon (centrala)<input name="phone_central" value="{{ client.phone_central or '' }}"></label>
+  <label>E-mail (zamówienia)<input type="email" name="email" value="{{ client.email or '' }}"></label>
+  <label>Strona WWW<input name="website" value="{{ client.website or '' }}"></label>
+</div></section>
+<section class="form-section"><h2>Adres i dane rejestrowe</h2><div class="form-grid">
+  <label class="span-2">Ulica i numer<input name="street" value="{{ client.street or '' }}"></label>
+  <label>Kod pocztowy<input name="postal_code" value="{{ client.postal_code or '' }}"></label>
+  <label>Miasto<input name="city" value="{{ client.city or '' }}"></label>
+  <label>Województwo<input name="voivodeship" value="{{ client.voivodeship or '' }}"></label>
+  <label>NIP<input name="nip" value="{{ client.nip or '' }}"></label>
+  <label>REGON<input name="regon" value="{{ client.regon or '' }}"></label>
+  <label>KRS<input name="krs" value="{{ client.krs or '' }}"></label>
+  <label class="span-2">Nr konta (IBAN)<input name="iban" value="{{ client.iban or '' }}"></label>
+  <label class="span-2">Uwagi<textarea name="notes" rows="3">{{ client.notes or '' }}</textarea></label>
+</div>{% if client.data_status %}<p class="muted catalog-hint">Źródło danych: {{ client.data_status }}</p>{% endif %}</section>
+<div class="form-actions">{% if client_id %}<button class="btn btn-danger" type="button" data-delete-form="delete-client" data-confirm="Usunąć klienta? Możliwe tylko, gdy nie ma produktów ani zamówień.">Usuń klienta</button>{% endif %}<span class="spacer"></span><a class="btn btn-ghost" href="{{ url_for('clients_index') }}">Anuluj</a><button class="btn btn-primary" type="submit">Zapisz klienta</button></div>
+</form>
+{% if client_id %}<form id="delete-client" method="post" action="{{ url_for('client_delete', client_id=client_id) }}" hidden><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>
+<section class="panel contacts-section"><h2>Ostatnie zamówienia</h2><div class="table-scroll"><table class="analysis-table"><thead><tr><th>Kod</th><th>Data</th><th>Status</th><th>Dostawa</th><th class="r">Poz.</th><th class="r">Ilość</th></tr></thead><tbody>
+{% for o in orders %}<tr><td><a href="{{ url_for('order_detail', order_id=o.id) }}"><span class="code zk-code">{{ o.number }}</span></a></td><td>{{ o.order_date|dt }}</td><td><span class="status status-{{ o.status|replace(' ', '-')|lower }}">{{ o.status|lower }}</span></td><td>{{ o.delivery_date|dt }}</td><td class="r">{{ o.lines }}</td><td class="r">{{ o.qty|n0 }}</td></tr>
+{% else %}<tr><td colspan="6" class="empty">Brak zamówień.</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ machine.name }} · Plastema{% endblock %}
+{% block body_class %}theme-green{% endblock %}
+{% block module_name %}Magazyny przy maszynach{% endblock %}
+{% block content %}
+<div class="form-heading"><div><a class="back" href="{{ url_for('machines_index') }}">← Wszystkie maszyny</a><div class="eyebrow">Pole odkładcze</div><h1>{{ machine.name }}</h1>
+  <p class="muted">Na polu leży {{ total_kg|num }} kg surowców o wartości {{ total_value|num }} zł.</p></div></div>
+
+<div class="doc-actions">
+{% for key, meta in doc_types.items() %}<form method="post" action="{{ url_for('create_machine_doc', machine_id=machine.id, slug=meta.slug) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="doc-action doc-{{ meta.slug }}" type="submit"><strong>{{ meta.button }}</strong><small>{{ meta.hint }}</small></button></form>{% endfor %}
+</div>
+
+{% if open_docs %}<section class="panel"><h2>Otwarte dokumenty tej maszyny</h2>{% for d in open_docs %}<p class="open-doc"><span class="code">{{ d.number }}</span> {{ doc_types[d.doc_type].label }} · {{ d.lines }} poz. · {{ d.kg|num }} kg <a class="btn btn-small btn-primary" href="{{ url_for('machine_doc', doc_id=d.id) }}">Otwórz</a></p>{% endfor %}</section>{% endif %}
+
+<section class="panel"><h2>Co leży na polu odkładczym</h2>
+  <div class="table-scroll"><table class="analysis-table"><thead><tr><th>Indeks</th><th>Surowiec</th><th>Kolor</th><th>Dostawca</th><th class="r">Na polu kg</th><th class="r">Wartość zł</th></tr></thead><tbody>
+  {% for r in stock %}<tr class="{{ 'row-big' if r.kg < 0 else '' }}"><td><span class="code material-code">{{ r.material_index }}</span></td><td><strong>{{ r.internal_name or r.symbol }}</strong></td><td>{{ r.color or '—' }}</td><td>{{ r.supplier or '—' }}</td><td class="r qty">{{ r.kg|num }}</td><td class="r">{{ (r.kg * r.price)|num }}</td></tr>
+  {% else %}<tr><td colspan="6" class="empty">Pole odkładcze jest puste.</td></tr>{% endfor %}
+  </tbody></table></div></section>
+
+<section class="panel"><h2>Ostatnie dokumenty</h2>
+  <div class="table-scroll"><table class="analysis-table"><thead><tr><th>Dokument</th><th>Typ</th><th>Data</th><th>Status</th><th class="r">Pozycji</th><th class="r">Razem kg</th><th>Wykonał</th><th></th></tr></thead><tbody>
+  {% for d in docs %}<tr><td><span class="code">{{ d.number }}</span></td><td>{{ doc_types[d.doc_type].label }}</td><td>{{ d.doc_date.strftime('%d.%m.%Y') }}<small>{{ d.shift or '' }}</small></td><td><span class="badge {{ 'badge-material' if d.status == 'ZREALIZOWANY' else 'badge-color' }}">{{ d.status|lower }}</span></td><td class="r">{{ d.lines }}</td><td class="r">{{ d.kg|num }}</td><td>{{ d.realized_by or '—' }}</td><td class="actions"><a class="btn btn-small" href="{{ url_for('machine_doc', doc_id=d.id) }}">{{ 'Otwórz' if d.status == 'OTWARTY' else 'Podgląd' }}</a></td></tr>
+  {% else %}<tr><td colspan="8" class="empty">Ta maszyna nie ma jeszcze żadnych dokumentów.</td></tr>{% endfor %}
+  </tbody></table></div></section>
+{% endblock %}

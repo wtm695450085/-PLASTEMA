@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Produkty · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Zamówienia{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Baza produktów · kod BBBB</div><h1>Produkty</h1>
+  <p class="muted">{{ counts.total }} produktów z raportu produkcyjnego. Każda karta łączy produkt z formą (EEE), tworzywem SS (FFF) i barwnikiem BT (GGG) z magazynu.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('product_form', klient=client_id or None) }}">+ Nowy produkt</a></section>
+<div class="stat-grid">
+  <a class="stat-card {{ 'stat-warn' if counts.forma else '' }}" href="{{ url_for('products_index', brak='forma', klient=client_id or None) }}"><span>Bez formy</span><strong>{{ counts.forma }}</strong><small>przypisz formę wtryskową</small></a>
+  <a class="stat-card" href="{{ url_for('products_index', brak='auto', klient=client_id or None) }}"><span>Forma do weryfikacji</span><strong>{{ counts.auto }}</strong><small>dopasowana automatycznie po nazwie</small></a>
+  <a class="stat-card" href="{{ url_for('products_index', brak='tworzywo', klient=client_id or None) }}"><span>Bez tworzywa SS</span><strong>{{ counts.tworzywo }}</strong><small>nie powiązano z kartoteką</small></a>
+  <a class="stat-card" href="{{ url_for('products_index', brak='barwnik', klient=client_id or None) }}"><span>Barwnik spoza kartoteki</span><strong>{{ counts.barwnik }}</strong><small>symbol nie znaleziony w BT</small></a>
+</div>
+<form class="filters" method="get">
+  <label class="search"><span>Szukaj</span><input name="q" value="{{ query }}" placeholder="nazwa, kod BBBB, tworzywo, barwnik"></label>
+  <label><span>Klient</span><select name="klient"><option value="">Wszyscy</option>{% for c in clients %}<option value="{{ c.id }}" {% if client_id == c.id|string %}selected{% endif %}>{{ c.short_name }}</option>{% endfor %}</select></label>
+  <label><span>Braki</span><select name="brak"><option value="">—</option>{% for k, v in [('forma','bez formy'),('auto','forma do weryfikacji'),('tworzywo','bez tworzywa'),('barwnik','barwnik spoza kartoteki'),('kolor','bez koloru')] %}<option value="{{ k }}" {% if missing == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>
+  <button class="btn btn-secondary" type="submit">Filtruj</button>{% if query or client_id or missing %}<a class="clear" href="{{ url_for('products_index') }}">Wyczyść</a>{% endif %}
+</form>
+<div class="table-card"><div class="table-scroll"><table class="materials-table"><thead><tr><th>BBBB</th><th>Klient</th><th>Produkt</th><th>Kolor</th><th>Forma</th><th>Tworzywo</th><th>Barwnik</th><th class="r">Brutto g</th><th class="r">Cykl s / gniazda</th><th class="r">Szt./zmianę</th><th>Maszyny</th><th class="r">Zleceń</th><th></th></tr></thead><tbody>
+{% for p in products %}<tr>
+  <td><span class="code">{{ '%04d'|format(p.code) }}</span></td><td>{{ p.short_name }}<small>{{ p.client_code }}</small></td>
+  <td><strong>{{ p.name }}</strong></td>
+  <td>{% if p.color_code %}<span class="code">{{ p.color_code }}</span><small>{{ p.color_name }}</small>{% else %}—{% endif %}</td>
+  <td>{% if p.mold_no %}<span class="code">{{ p.mold_no }}</span>{% if p.mold_match == 'AUTO' %}<small class="badge badge-color">do weryfikacji</small>{% endif %}{% else %}<span class="minus">brak</span>{% endif %}</td>
+  <td>{% if p.material_index %}<span class="code material-code">{{ p.material_index }}</span>{% endif %}<small>{{ p.material_text or '' }}</small></td>
+  <td>{% if p.colorant_index %}<span class="code">{{ p.colorant_index }}</span>{% endif %}<small>{{ p.colorant_text or '' }}{% if p.colorant_pct and p.colorant_index %} · {{ p.colorant_pct|num }}%{% endif %}</small></td>
+  <td class="r">{{ p.gross_g|num }}</td><td class="r">{{ p.cycle_s|num }} / {{ p.cavities|num }}</td><td class="r">{{ p.per_shift|n0 }}</td><td>{{ p.machines or '—' }}</td><td class="r">{{ p.orders_count or 0 }}</td>
+  <td class="actions"><a class="btn btn-small" href="{{ url_for('product_form', product_id=p.id) }}">Edytuj</a></td>
+</tr>{% else %}<tr><td colspan="13" class="empty">Brak produktów.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% if products|length == 800 %}<p class="muted catalog-hint">Pokazano pierwsze 800 produktów — zawęź filtr.</p>{% endif %}
+{% endblock %}

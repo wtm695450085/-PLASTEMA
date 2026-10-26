@@ -1,0 +1,28 @@
+{# Nagłówek zamówienia produkcji (dok. 2 + karta dok. 8) — zwarta ramka z tabelką. Zmienne: o (zamówienie albo formularz), molds, ss, editable #}
+{% set dis = '' if editable else 'disabled' %}
+<section class="form-section zp-form"><div class="table-scroll"><table class="zp-table"><colgroup><col class="zl"><col><col class="zl"><col><col class="zl"><col><col class="zl"><col></colgroup><tbody>
+  <tr class="zp-head"><td colspan="8">Zamówienie produkcji (dok. 2)</td></tr>
+  <tr><th>Produkt (bez koloru) *</th><td colspan="3"><input name="product_name" value="{{ o.product_name or '' }}" required {{ dis }} placeholder="np. LOLLIPOP WALLY"></td>
+    <th>Wtryskarka</th><td><select name="machine_no" {{ dis }}><option value="">—</option>{% for m in range(1, 10) %}<option {% if o.machine_no|string == m|string %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></td>
+    <th>Forma EEE</th><td><select name="mold_id" {{ dis }}><option value="">—</option>{% for m in molds %}<option value="{{ m.id }}" {% if o.mold_id|string == m.id|string %}selected{% endif %}>{{ m.mold_no }} {{ m.name }}{% if m.status != 'SPRAWNA' %} [{{ m.status }}]{% endif %}</option>{% endfor %}</select></td></tr>
+  <tr><th>Data zamówienia</th><td><input type="date" name="order_date" value="{{ o.order_date.isoformat() if o.order_date and o.order_date.isoformat is defined else (o.order_date or today.isoformat()) }}" {{ dis }}></td>
+    <th>Planowany start</th><td><input type="date" name="planned_start" value="{{ o.planned_start.isoformat() if o.planned_start and o.planned_start.isoformat is defined else (o.planned_start or '') }}" {{ dis }}></td>
+    <th>Planowany koniec</th><td><input type="date" name="planned_end" value="{{ o.planned_end.isoformat() if o.planned_end and o.planned_end.isoformat is defined else (o.planned_end or '') }}" {{ dis }}></td>
+    <th>Ilość całości [szt.]</th><td><input name="qty_total" value="{{ o.qty_total or '' }}" inputmode="numeric" {{ dis }} placeholder="puste = suma kolorów"></td></tr>
+  <tr><th>Tworzywo (SS)</th><td colspan="3"><select name="material_id" {{ dis }}><option value="">—</option>{% for m in ss %}<option value="{{ m.id }}" {% if o.material_id|string == m.id|string %}selected{% endif %}>{{ m.material_index }} {{ m.name }}</option>{% endfor %}</select></td>
+    <th>Udział [%]</th><td><input name="material_share" value="{{ o.material_share|num if o.material_share is number else (o.material_share or 100) }}" inputmode="decimal" {{ dis }}></td>
+    <th>Zapotrzebowanie [kg]</th><td><input name="material_kg" value="{{ o.material_kg|num if o.material_kg is number else (o.material_kg or '') }}" inputmode="decimal" {{ dis }} placeholder="puste = wylicz"></td></tr>
+  <tr><th>Tworzywo 2 — mieszanka</th><td colspan="3"><select name="material2_id" {{ dis }}><option value="">— brak —</option>{% for m in ss %}<option value="{{ m.id }}" {% if o.material2_id|string == m.id|string %}selected{% endif %}>{{ m.material_index }} {{ m.name }}</option>{% endfor %}</select></td>
+    <th>Udział 2 [%]</th><td><input name="material2_share" value="{{ o.material2_share|num if o.material2_share is number else (o.material2_share or '') }}" inputmode="decimal" {{ dis }}></td>
+    <th>Tworzywo wg planu</th><td><input name="material_text" value="{{ o.material_text or '' }}" {{ dis }}></td></tr>
+  <tr class="zp-head"><td colspan="8">Karta produkcyjna (dok. 8) i wydajność</td></tr>
+  <tr><th>Waga detalu [g]</th><td><input name="net_g" value="{{ o.net_g|num if o.net_g is number else (o.net_g or '') }}" inputmode="decimal" {{ dis }}></td>
+    <th>Wydajność / zmianę 8 h</th><td><input name="per_shift" value="{{ o.per_shift or '' }}" inputmode="numeric" {{ dis }}></td>
+    <th>Krotność formy</th><td><input name="cavities" value="{{ o.cavities or 1 }}" inputmode="numeric" {{ dis }}></td>
+    <th>Sztuk w kartonie</th><td><input name="pcs_per_carton" value="{{ o.pcs_per_carton or '' }}" inputmode="numeric" {{ dis }}></td></tr>
+  <tr><th>Rodzaj kartonu</th><td><input name="carton_type" value="{{ o.carton_type or '' }}" {{ dis }} placeholder="np. P5"></td>
+    <th>Waga kartonu [kg]</th><td><input name="carton_kg" value="{{ o.carton_kg|num if o.carton_kg is number else (o.carton_kg or '') }}" inputmode="decimal" {{ dis }}></td>
+    <th>Wystawił(a)</th><td><input name="issued_by" value="{{ o.issued_by or '' }}" {{ dis }} placeholder="np. Ania Kwiatek"></td>
+    <th>Przyjął(a) na halę</th><td><input name="accepted_by" value="{{ o.accepted_by or '' }}" {{ dis }}></td></tr>
+  <tr><th>Uwagi</th><td colspan="7"><input name="notes" value="{{ o.notes or '' }}" {{ dis }} placeholder="np. kolory wg specyfikacji, start od granatowego"></td></tr>
+</tbody></table></div></section>

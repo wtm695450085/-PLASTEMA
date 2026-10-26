@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Maszyny · Plastema{% endblock %}
+{% block body_class %}theme-green{% endblock %}
+{% block module_name %}Magazyny przy maszynach{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Pola odkładcze maszyn</div><h1>Magazyny przy maszynach</h1>
+  <p class="muted">9 maszyn produkuje według planu. Przed produkcją magazynier przenosi surowiec na pole odkładcze, po szarży niezużyte wraca do magazynu głównego.</p></div>
+  <a class="btn btn-secondary" href="{{ url_for('machine_docs_index') }}">Historia dokumentów</a></section>
+
+<div class="machine-grid">
+{% for m in machines %}
+  <a class="machine-card" href="{{ url_for('machine_detail', machine_id=m.id) }}">
+    <div class="machine-card-head"><span class="machine-no">{{ m.id }}</span><strong>{{ m.name }}</strong>{% if m.open_docs %}<span class="badge badge-color">{{ m.open_docs }} do realizacji</span>{% endif %}</div>
+    <div class="machine-kg">{{ m.kg|num }} <small>kg na polu</small></div>
+    <div class="muted">{{ m['items'] }} {{ 'pozycja' if m['items'] == 1 else 'pozycji' }} · {{ m.value|num }} zł</div>
+    <ul class="machine-top">{% for t in m.top %}<li><span class="code material-code">{{ t.material_index }}</span> {{ t.internal_name or t.symbol }}<b>{{ t.kg|num }} kg</b></li>{% else %}<li class="muted">Pole odkładcze puste</li>{% endfor %}{% if m.more %}<li class="muted">… i {{ m.more }} więcej</li>{% endif %}</ul>
+  </a>
+{% endfor %}
+</div>
+
+<section class="panel"><h2>Do zrealizowania przez magazyniera ({{ open_docs|length }})</h2>
+  <div class="table-scroll"><table class="analysis-table"><thead><tr><th>Dokument</th><th>Typ</th><th>Maszyna</th><th>Data</th><th class="r">Pozycji</th><th class="r">Razem kg</th><th></th></tr></thead><tbody>
+  {% for d in open_docs %}<tr><td><span class="code">{{ d.number }}</span></td><td>{{ doc_types[d.doc_type].label }}</td><td>Maszyna {{ d.machine_id }}</td><td>{{ d.doc_date.strftime('%d.%m.%Y') }}<small>{{ d.shift or '' }}</small></td><td class="r">{{ d.lines }}</td><td class="r">{{ d.kg|num }}</td><td class="actions"><a class="btn btn-small btn-primary" href="{{ url_for('machine_doc', doc_id=d.id) }}">Otwórz</a></td></tr>
+  {% else %}<tr><td colspan="7" class="empty">Brak otwartych dokumentów — wszystko zrealizowane.</td></tr>{% endfor %}
+  </tbody></table></div></section>
+{% endblock %}

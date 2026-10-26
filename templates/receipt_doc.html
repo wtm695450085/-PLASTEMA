@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ receipt.number }} · Przyjęcie towaru · Plastema{% endblock %}
+{% block content %}
+{% set editable = receipt.status == 'OTWARTY' %}
+<div class="form-heading"><div><a class="back" href="{{ url_for('receipts_index') }}">← Przyjęcia towaru</a>
+  <div class="eyebrow">Przyjęcie surowca od dostawcy zewnętrznego</div><h1>{{ receipt.number }} <span class="badge {{ 'badge-color' if editable else 'badge-material' }}">{{ 'otwarte' if editable else 'przyjęte' }}</span></h1>
+  <p class="muted">Tworzywa i barwniki przyjmujesz w osobnych sekcjach. Po „Przyjęto na magazyn” stan magazynu głównego wzrośnie od razu.</p></div></div>
+
+{% if not editable %}<div class="alert alert-success">Przyjęto {{ receipt.realized_at.strftime('%d.%m.%Y %H:%M') }}{% if receipt.received_by %} — {{ receipt.received_by }}{% endif %}. Nie można już zmieniać tego dokumentu.</div>{% endif %}
+
+<form method="post" id="doc-form" action="{{ url_for('save_receipt', receipt_id=receipt.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% if show_all %}<input type="hidden" name="all" value="1">{% endif %}
+  <button class="visually-hidden" type="submit" name="action" value="save" tabindex="-1" aria-hidden="true">Zapisz</button>
+  <section class="form-section"><div class="form-grid doc-meta">
+    <label class="span-2"><span>Dostawca *</span><select name="supplier_id" {% if not editable %}disabled{% endif %}><option value="">— wybierz dostawcę —</option>
+      {% for group, label in (('TWORZYWO','Dostawcy tworzyw'),('BARWNIK','Dostawcy barwników')) %}<optgroup label="{{ label }}">{% for s in suppliers if s.material_type == group %}<option value="{{ s.id }}" {% if receipt.supplier_id == s.id %}selected{% endif %}>{{ s.supplier_no }} · {{ s.short_name or s.name }}</option>{% endfor %}</optgroup>{% endfor %}</select></label>
+    <label><span>Data przyjęcia</span><input type="date" name="doc_date" value="{{ receipt.doc_date.isoformat() }}" {% if not editable %}disabled{% endif %}></label>
+    <label><span>Nr dokumentu dostawcy (WZ / faktura)</span><input name="delivery_doc" value="{{ receipt.delivery_doc or '' }}" placeholder="np. WZ 123/2026" {% if not editable %}disabled{% endif %}></label>
+    <label><span>Nr zamówienia</span><input name="order_ref" value="{{ receipt.order_ref or '' }}" {% if not editable %}disabled{% endif %}></label>
+    <label><span>Dostawę zgłosił(a)</span><input name="created_by" value="{{ receipt.created_by or '' }}" placeholder="imię i nazwisko" {% if not editable %}disabled{% endif %}></label>
+    <label class="span-2"><span>Uwagi (stan opakowań, uszkodzenia, braki w dostawie)</span><input name="notes" value="{{ receipt.notes or '' }}" {% if not editable %}disabled{% endif %}></label>
+  </div>
+  {% if editable and receipt.supplier_id %}<p class="muted catalog-hint">{% if restricted %}Listy poniżej pokazują tylko surowce tego dostawcy. <a href="{{ url_for('receipt_sheet', receipt_id=receipt.id, wszystkie='1') }}">Pokaż wszystkie</a>{% else %}Listy pokazują wszystkie surowce. {% if show_all %}<a href="{{ url_for('receipt_sheet', receipt_id=receipt.id) }}">Tylko tego dostawcy</a>{% endif %}{% endif %}</p>{% endif %}
+  </section>
+
+  {% for sec in sections %}{% if editable or sec.lines %}
+  <section class="doc-section sec-{{ sec.code|lower }}" id="add-{{ sec.code }}">
+    <h2 class="sec-title"><span class="sec-tag">{{ sec.code }}</span> {{ sec.label }}<small>{{ sec.lines|length }} poz. · {{ sec.kg|num }} kg · {{ sec.value|num }} zł</small></h2>
+    <div class="table-card"><div class="table-scroll"><table class="inventory-table doc-table"><thead><tr><th>Indeks</th><th>Pozycja</th><th>Kolor</th><th class="r">Ilość kg</th><th class="r">Cena zł/kg</th><th>Nr partii / LOT</th><th>Uwagi</th>{% if editable %}<th></th>{% endif %}</tr></thead><tbody>
+    {% for l in sec.lines %}<tr>
+      <td><span class="code material-code">{{ l.material_index }}</span></td><td><strong>{{ l.internal_name or l.symbol }}</strong><small>{{ l.supplier or '' }}</small></td><td>{{ l.color or '—' }}</td>
+      {% if editable %}<td class="r"><input class="qty-input" name="qty_{{ l.id }}" value="{{ l.qty_kg|qty_input }}" inputmode="decimal" autocomplete="off" aria-label="Ilość kg {{ l.material_index }}"></td>
+      <td class="r"><input class="qty-input" name="price_{{ l.id }}" value="{{ l.unit_price|qty_input }}" inputmode="decimal" autocomplete="off" aria-label="Cena zł/kg {{ l.material_index }}"></td>
+      <td><input class="note-input lot-input" name="lot_{{ l.id }}" value="{{ l.lot or '' }}" autocomplete="off"></td><td><input class="note-input" name="note_{{ l.id }}" value="{{ l.notes or '' }}" autocomplete="off"></td>
+      <td class="actions"><button class="btn btn-small btn-danger" type="submit" name="delete_line" value="{{ l.id }}" data-confirm="Usunąć tę pozycję z przyjęcia?">Usuń</button></td>
+      {% else %}<td class="r"><strong>{{ l.qty_kg|num }}</strong></td><td class="r">{{ l.unit_price|num }}</td><td>{{ l.lot or '—' }}</td><td>{{ l.notes or '' }}</td>{% endif %}
+    </tr>{% else %}<tr><td colspan="8" class="empty">Brak pozycji w tej sekcji.</td></tr>{% endfor %}
+    </tbody></table></div></div>
+    {% if editable %}
+    <div class="add-line-row">
+      <label class="search"><span>Dodaj: {{ sec.label|lower }}</span><input name="add_material_{{ sec.code }}" list="list-{{ sec.code }}" placeholder="{{ 'wpisz indeks, nazwę lub kolor, np. SS015…' if sec.code == 'SS' else 'wpisz indeks, symbol lub kolor, np. BT004…' }}" autocomplete="off" data-add-for="{{ sec.code }}"></label>
+      <label><span>Ilość kg</span><input name="add_qty_{{ sec.code }}" inputmode="decimal" placeholder="0" autocomplete="off" class="qty-input" data-add-for="{{ sec.code }}"></label>
+      <button class="btn btn-secondary" type="submit" name="action" value="add_{{ sec.code }}" id="add-button-{{ sec.code }}">+ Dodaj</button>
+    </div>
+    <datalist id="list-{{ sec.code }}">{% for m in sec.catalog %}<option value="{{ m.material_index }} — {{ m.internal_name }}{% if m.color %} ({{ m.color }}){% endif %} · stan {{ m.kg|num }} kg"></option>{% endfor %}</datalist>
+    {% endif %}
+  </section>
+  {% endif %}{% endfor %}
+
+  <p class="doc-total"><strong>Razem w przyjęciu: {{ totals.kg|num }} kg · {{ totals.value|num }} zł</strong></p>
+
+  {% if editable %}
+  <div class="save-bar">
+    <label class="performer"><span>Przyjął na magazyn *</span><input name="received_by" placeholder="imię i nazwisko" value="{{ receipt.received_by or '' }}"></label>
+    <span class="spacer"></span>
+    <button class="btn btn-small btn-danger" type="submit" form="doc-delete" data-confirm="Usunąć to otwarte przyjęcie?">Usuń przyjęcie</button>
+    <button class="btn btn-secondary" type="submit" name="action" value="save">Zapisz</button>
+    <button class="btn btn-primary btn-done" type="submit" name="action" value="realize" data-confirm="Przyjąć towar na magazyn? Stan magazynu głównego wzrośnie, a dokumentu nie będzie można już zmienić.">Przyjęto na magazyn</button>
+  </div>
+  {% endif %}
+</form>
+{% if editable %}<form id="doc-delete" method="post" action="{{ url_for('delete_receipt', receipt_id=receipt.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>{% endif %}
+<script src="{{ url_for('static', filename='machines.js') }}" defer></script>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Kolory · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Zamówienia{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Baza kolorów · kod CCC</div><h1>Kolory</h1>
+  <p class="muted">Kod koloru CCC jest trzecią częścią kodu produkcji AAA-BBBB-CCC. 000 = naturalny / bez barwnika. Słownik powstał z nazw produktów — można go edytować i rozszerzać.</p></div></section>
+<form method="post" class="filters"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label><span>Kod CCC</span><input name="code" value="{{ next_code }}" maxlength="3" required></label>
+  <label class="search"><span>Nazwa koloru</span><input name="name" required placeholder="np. LIMONKOWY"></label>
+  <label class="search"><span>Uwagi</span><input name="notes"></label>
+  <button class="btn btn-primary" type="submit">+ Dodaj kolor</button>
+</form>
+<div class="table-card"><div class="table-scroll"><table class="analysis-table"><thead><tr><th>CCC</th><th>Nazwa</th><th>Uwagi</th><th class="r">Produkty</th><th></th></tr></thead><tbody>
+{% for c in colors %}<tr><td colspan="5"><form method="post" class="color-row"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="id" value="{{ c.id }}">
+  <input class="code-input" name="code" value="{{ c.code }}" maxlength="3" aria-label="Kod"><input name="name" value="{{ c.name }}" aria-label="Nazwa"><input name="notes" value="{{ c.notes or '' }}" aria-label="Uwagi">
+  <span class="r">{{ c.products }} prod.</span><button class="btn btn-small" type="submit">Zapisz</button></form></td></tr>
+{% endfor %}</tbody></table></div></div>
+{% endblock %}

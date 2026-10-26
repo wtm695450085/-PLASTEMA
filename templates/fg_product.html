@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Kartoteka {{ product.name }} · Plastema{% endblock %}
+{% block body_class %}theme-teal{% endblock %}
+{% block module_name %}PLASTEMA · Magazyn wyrobów gotowych{% endblock %}
+{% block content %}
+<div class="form-heading"><div><a class="back" href="{{ url_for('fg_stock') }}">← Magazyn wyrobów gotowych</a><div class="eyebrow">Kartoteka wyrobu · {{ product.short_name }}</div>
+  <h1><span class="code">{{ '%04d'|format(product.code) }}</span> {{ product.name }}</h1>
+  <p class="muted">Kod produkcji {{ product.client_code }}-{{ '%04d'|format(product.code) }}-{{ product.color_code or '000' }} · karton {{ product.pcs_per_carton or '?' }} szt. · <a href="{{ url_for('product_form', product_id=product.id) }}">karta produktu</a></p></div>
+  <div class="barcode-card"><span class="barcode-label">Stan</span><strong class="big-qty">{{ balance|n0 }}</strong><small>szt.</small></div></div>
+<section class="panel"><h2>Stan wg szarż</h2><div class="table-scroll"><table class="analysis-table"><thead><tr><th>Kod szarży</th><th>Pierwsze przyjęcie</th><th>Miejsce</th><th class="r">Ilość</th></tr></thead><tbody>
+{% for b in batches %}<tr class="{{ 'row-big' if b.qty < 0 else '' }}"><td><span class="code">{{ b.batch_code or 'bez szarży' }}</span></td><td>{{ b.first_in|dt }}</td><td>{{ b.location or '—' }}</td><td class="r qty">{{ b.qty|n0 }}</td></tr>
+{% else %}<tr><td colspan="4" class="empty">Brak towaru na stanie.</td></tr>{% endfor %}</tbody></table></div></section>
+<section class="panel"><h2>Ruchy ({{ moves|length }})</h2><div class="table-scroll"><table class="analysis-table"><thead><tr><th>Data</th><th>Ruch</th><th>Dokument</th><th>Szarża</th><th>Zamówienie</th><th>Miejsce</th><th class="r">Ilość</th><th class="r">Stan po</th></tr></thead><tbody>
+{% for m in moves %}<tr><td>{{ m.move_date|dt }}</td><td><span class="badge {{ 'badge-material' if m.qty > 0 else 'badge-color' }}">{{ m.move_type }}</span> <small>{{ fg_move_labels[m.move_type] }}</small></td>
+  <td>{% if m.doc_id %}<a href="{{ url_for('fg_doc', doc_id=m.doc_id) }}">{{ m.doc_number }}</a>{% elif m.pw_number %}<a href="{{ url_for('settlement_color', color_id=m.color_id) }}#przyjecie">PW {{ m.pw_number }}</a>{% endif %}</td>
+  <td>{{ m.batch_code or '—' }}</td><td>{% if m.zk_id %}<a href="{{ url_for('order_detail', order_id=m.zk_id) }}">{{ m.zk_number }}</a>{% elif m.internal_order %}zam. prod. {{ m.internal_order }}{% endif %}</td>
+  <td>{{ m.location or '' }}</td><td class="r {{ 'plus' if m.qty > 0 else 'minus' }}">{{ '+' if m.qty > 0 else '' }}{{ m.qty|n0 }}</td><td class="r qty">{{ m.balance|n0 }}</td></tr>
+{% else %}<tr><td colspan="8" class="empty">Brak ruchów.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

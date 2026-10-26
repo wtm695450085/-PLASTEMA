@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Plan wtryskarek · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Zamówienia{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Weryfikacja zdolności produkcyjnych</div><h1>Plan obciążenia 9 wtryskarek</h1>
+  <p class="muted">Zamówienia przyjęte i w produkcji. Nowe zamówienie dostaje pierwszą wolną maszynę spośród tych, na których produkt był już robiony.</p></div>
+  <form method="get" class="head-actions"><label class="inline-label">Horyzont<select name="dni">{% for d in (14, 28, 56, 90) %}<option value="{{ d }}" {% if horizon == d %}selected{% endif %}>{{ d }} dni</option>{% endfor %}</select></label><button class="btn btn-secondary" type="submit">Pokaż</button></form></section>
+
+<section class="panel gantt">
+  <div class="gantt-row gantt-head"><span></span><div class="gantt-track">{% for t in ticks %}<i class="tick {{ 'weekend' if t.weekend else '' }}" data-left="{{ t.left }}">{{ t.label }}</i>{% endfor %}</div></div>
+  {% for m in machines %}
+  <div class="gantt-row"><span class="machine-label"><b class="machine-no">{{ m.no }}</b><small>{% if m.busy_until %}zajęta do {{ m.busy_until|dt('%d.%m %H:%M') }}{% else %}wolna{% endif %}</small></span>
+    <div class="gantt-track">{% for it in m['items'] %}<a class="job job-{{ it.job.status|replace(' ', '-')|lower }}" data-left="{{ it.left }}" data-w="{{ it.width }}" href="{{ url_for('order_detail', order_id=it.job.order_id) }}" title="{{ it.job.number }} · {{ it.job.short_name }} · {{ it.job.product_name }} · {{ it.job.qty|n0 }} szt. · {{ it.job.planned_start|dt('%d.%m %H:%M') }} → {{ it.job.planned_end|dt('%d.%m %H:%M') }}">{{ it.job.short_name }} · {{ it.job.product_name }}</a>{% endfor %}</div></div>
+  {% endfor %}
+  <p class="muted catalog-hint">Niebieskie — przyjęte, zielone — w produkcji. Najedź na pasek, żeby zobaczyć szczegóły; kliknij, żeby otworzyć zamówienie.</p>
+</section>
+
+<section class="table-card"><div class="table-scroll"><table><thead><tr><th>Maszyna</th><th>Zamówienie</th><th>Klient</th><th>Produkt</th><th class="r">Ilość</th><th>Forma</th><th>Start</th><th>Koniec</th><th>Szarża</th></tr></thead><tbody>
+{% for j in jobs %}<tr><td><b class="machine-no">{{ j.machine_no or '?' }}</b></td><td><a href="{{ url_for('order_detail', order_id=j.order_id) }}"><span class="code zk-code">{{ j.number }}</span></a></td><td>{{ j.short_name }}</td><td>{{ j.product_name }}<small>{{ j.production_code or '' }}</small></td><td class="r">{{ j.qty|n0 }}</td><td>{{ j.mold_no or '—' }}</td><td>{{ j.planned_start|dt('%d.%m %H:%M') }}</td><td>{{ j.planned_end|dt('%d.%m %H:%M') }}</td><td>{{ j.batch_code or '—' }}</td></tr>
+{% else %}<tr><td colspan="9" class="empty">Brak zaplanowanej produkcji. Przyjmij zamówienie do realizacji, a pojawi się w planie.</td></tr>{% endfor %}
+</tbody></table></div></section>
+
+<form method="post" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h2>Parametry planowania</h2>
+  <div class="form-grid plan-settings">{% for key, label in labels.items() %}<label>{{ label }}<input name="{{ key }}" value="{{ cfg[key]|num }}" inputmode="decimal"></label>{% endfor %}</div>
+  <p class="muted catalog-hint">Zmiany pracują od 6:00. Czas produkcji = ilość ÷ (średnio detali na zmianę ÷ 8 h) + przezbrojenie. Zapotrzebowanie surowca = ilość × waga brutto × (1 + naddatek).</p>
+  <div class="form-actions"><span class="spacer"></span><button class="btn btn-primary" type="submit">Zapisz parametry</button></div>
+</form>
+<script src="{{ url_for('static', filename='orders.js') }}" defer></script>
+{% endblock %}

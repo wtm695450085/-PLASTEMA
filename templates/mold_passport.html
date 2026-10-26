@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Paszport formy {{ mold.mold_no }} · Plastema{% endblock %}
+{% block body_class %}theme-blue passport-page{% endblock %}
+{% block module_name %}PLASTEMA · Formy wtryskowe{% endblock %}
+{% block content %}
+<div class="form-heading passport-head">
+  <div><a class="back no-print" href="{{ url_for('molds_index') }}">← Formy wtryskowe</a>
+    <div class="eyebrow">Paszport formy wtryskowej</div>
+    <h1><span class="mold-code-big">{{ mold.mold_no }}</span> {{ mold.name }}</h1>
+    <p class="muted"><span class="status mold-{{ mold.status|replace(' ', '-')|lower }}">{{ mold.status|lower }}</span>
+      {% if mold.client_name %} · klient {{ mold.client_name }} ({{ mold.client_code }}){% endif %}{% if mold.owner %} · {{ mold.owner }}{% endif %}{% if mold.storage %} · pole {{ mold.storage }}{% endif %}</p></div>
+  <figure class="barcode-card"><span class="barcode-label">Kod formy EEE</span><img src="{{ barcode_uri(mold.mold_no) }}" alt="Kod kreskowy formy {{ mold.mold_no }}"><figcaption>{{ mold.mold_no }}</figcaption></figure>
+</div>
+<div class="mail-bar no-print">
+  <a class="btn btn-primary" href="{{ url_for('mold_form', mold_id=mold.id) }}">Edytuj paszport</a>
+  <button class="btn btn-secondary" type="button" data-print>Drukuj paszport</button>
+  <a class="btn" href="#montaze">Rejestr montaży</a>
+  <a class="btn" href="#dziennik">+ Wpis serwisowy</a>
+</div>
+
+<div class="stat-grid passport-stats">
+  <div class="stat-card"><span>Ostatnie użycie</span><strong>{{ summary.last_used|dt }}</strong><small>{% if summary.machines_used %}maszyny {{ summary.machines_used|join(', ') }}{% else %}brak historii{% endif %}</small></div>
+  <div class="stat-card"><span>Użycia w produkcji</span><strong>{{ summary.uses }}</strong><small>zamówień · {{ summary.qty|n0 }} dobrych szt.</small></div>
+  <div class="stat-card"><span>Licznik cykli</span><strong>{{ summary.counter|n0 }}</strong><small>{% if summary.life_pct is not none %}{{ summary.life_pct|num }}% żywotności{% else %}{{ mold.cavities or '?' }} gniazd{% endif %}</small></div>
+  <div class="stat-card {{ 'stat-warn' if summary.to_service is not none and summary.to_service <= 0 else '' }}"><span>Przegląd</span><strong>{% if summary.to_service is none %}—{% elif summary.to_service <= 0 %}wymagany{% else %}za {{ summary.to_service|n0 }}{% endif %}</strong><small>{% if summary.last_service %}ostatni {{ summary.last_service.event_date|dt }}{% else %}brak wpisu przeglądu{% endif %}{% if mold.service_interval_cycles %} · co {{ mold.service_interval_cycles|n0 }} cykli{% endif %}</small></div>
+  <div class="stat-card"><span>Plan</span><strong>{% if summary.busy_until %}do {{ summary.busy_until|dt('%d.%m') }}{% else %}wolna{% endif %}</strong><small>{{ planned|length }} zaplanowanych pozycji</small></div>
+</div>
+
+<section class="panel" id="zdjecia"><h2>Zdjęcia formy (5) i detalu (2)</h2>
+  {% for group, slots in (('Forma', form_slots), ('Detal produkowany w formie', detail_slots)) %}
+  <h3 class="photo-group">{{ group }}</h3>
+  <div class="photo-grid {{ 'photo-grid-detail' if group != 'Forma' else '' }}">
+    {% for slot in slots %}{% set ph = photos.get(slot) %}
+    <figure class="photo-slot {{ 'has-photo' if ph else '' }}">
+      {% if ph %}<a href="{{ url_for('mold_photo', mold_id=mold.id, slot=slot) }}" target="_blank" rel="noopener"><img src="{{ url_for('mold_photo', mold_id=mold.id, slot=slot, mini=1) }}" alt="{{ slot_labels[slot] }}"></a>
+      {% else %}<div class="photo-empty">{{ slot }}<small>brak zdjęcia</small></div>{% endif %}
+      <figcaption><b>{{ slot }}.</b> {{ slot_labels[slot] }}{% if ph %}<small>{{ ph.uploaded_at|dt('%d.%m.%Y') }}</small>{% endif %}</figcaption>
+      <form class="no-print photo-form" method="post" enctype="multipart/form-data" action="{{ url_for('mold_photo_upload', mold_id=mold.id, slot=slot) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="file" name="photo" accept="image/*" aria-label="Zdjęcie {{ slot }}" data-autosubmit>
+        {% if ph %}<button class="btn btn-small btn-danger" type="submit" name="action" value="delete" data-confirm="Usunąć to zdjęcie?">Usuń</button>{% endif %}
+      </form>
+    </figure>{% endfor %}
+  </div>{% endfor %}
+  <p class="muted catalog-hint no-print">Wybierz plik albo zrób zdjęcie telefonem — wgrywa się od razu. Zdjęcia są pomniejszane do 1800 px i zapisywane w bazie (trafiają do kopii zapasowej).</p>
+</section>
+
+<div class="passport-grid">
+{% for title, fields in sections %}
+<section class="panel passport-section"><h2>{{ title }}</h2><dl class="passport-dl">
+  {% for col, label, kind, opt in fields %}{% if col != 'name' %}{% set v = mold[col] %}
+  <div><dt>{{ label|replace(' *', '') }}</dt><dd>{% if v is none or v == '' %}<span class="muted">—</span>
+    {% elif col == 'client_id' %}{{ mold.client_name }} ({{ mold.client_code }})
+    {% elif col == 'spi_class' %}{{ spi_classes.get(v, v) }}
+    {% elif kind == 'date' %}{{ v|dt }}
+    {% elif kind == 'num' %}{{ v|num }}{% elif kind == 'int' %}{{ v|n0 }}
+    {% elif col == 'status' %}<span class="status mold-{{ v|replace(' ', '-')|lower }}">{{ v|lower }}</span>
+    {% else %}{{ v }}{% endif %}</dd></div>
+  {% endif %}{% endfor %}
+</dl></section>
+{% endfor %}
+</div>
+
+<section class="panel"><h2>Uwagi</h2>{% if mold.notes %}<p class="passport-notes">{{ mold.notes }}</p>{% else %}<p class="muted">Brak uwag. <a class="no-print" href="{{ url_for('mold_form', mold_id=mold.id) }}">Dodaj w paszporcie</a>.</p>{% endif %}</section>
+
+<section class="panel"><h2>Produkty z tej formy — kody do kodowania produkcji ({{ products|length }})</h2>
+  <div class="table-scroll"><table class="analysis-table"><thead><tr><th>Kod produkcji AAA-BBBB-CCC</th><th>Pełny kod AAA-BBBB-CCC-EEE-FFF-GGG</th><th>Klient</th><th>Produkt</th><th>Kolor CCC</th><th>Tworzywo FFF</th><th>Barwnik GGG</th><th class="r">Gniazda</th><th class="r">Cykl s</th><th>Przypisanie</th></tr></thead><tbody>
+  {% for p in products %}<tr><td><span class="code">{{ p.production_code }}</span></td><td><span class="code">{{ p.full_code }}</span></td><td>{{ p.short_name }}</td>
+    <td><a href="{{ url_for('product_form', product_id=p.id) }}">{{ p.name }}</a></td><td>{{ p.color_code or '000' }} <small>{{ p.color_name or '' }}</small></td>
+    <td>{{ p.material_index or '—' }}</td><td>{{ p.colorant_index or '—' }}</td><td class="r">{{ p.cavities|num if p.cavities else '—' }}</td><td class="r">{{ p.cycle_s|num if p.cycle_s else '—' }}</td>
+    <td>{% if p.mold_match == 'AUTO' %}<span class="badge badge-color">do weryfikacji</span>{% else %}<span class="badge badge-material">potwierdzone</span>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="10" class="empty">Żaden produkt nie ma przypisanej tej formy. Przypisz ją w karcie produktu.</td></tr>{% endfor %}</tbody></table></div></section>
+
+<section class="panel" id="montaze"><h2>Rejestr montaży formy ({{ mounts|length }})</h2>
+  <p class="muted no-print">Jak w paszporcie formy (.xlsx): montaż, demontaż, liczba wtrysków, narzędziownia, zdjęcia, awarie. Wpisy z rozliczenia produkcji tworzą się same (liczba wtrysków = cykle z licznika PLC); montaże sprzed systemu są odtworzone ze statystyki.</p>
+  <div class="table-scroll"><table class="analysis-table mount-table"><thead><tr><th>Data montażu</th><th>Data demontażu</th><th class="r">Liczba wtrysków</th><th>Masz.</th><th>Zamówienie</th><th>Zakładał / demontował</th><th>Wydano do narzędziowni</th><th>Powrót z narzędziowni</th><th>Indeksy zdjęć</th><th>Numer awarii</th><th>Opis awarii</th><th class="no-print"></th></tr></thead><tbody>
+  {% for m in mounts %}<tr class="{{ 'row-missing' if m.failure_no else '' }}"><td>{{ m.mount_date|dt }}</td><td>{{ m.dismount_date|dt if m.dismount_date else ('pracuje' if m.mount_date else '—') }}</td>
+    <td class="r qty">{{ m.shots|n0 if m.shots else '—' }}</td><td>{{ m.machine_no or '' }}</td><td>{{ m.internal_order or '' }}<small>{{ m.source }}</small></td>
+    <td>{{ m.mounted_by or '' }}{% if m.dismounted_by %} / {{ m.dismounted_by }}{% endif %}</td><td>{{ m.toolroom_out|dt if m.toolroom_out else '' }}</td><td>{{ m.toolroom_back|dt if m.toolroom_back else '' }}</td>
+    <td>{{ m.photo_refs or '' }}</td><td>{{ m.failure_no or '' }}</td><td>{{ m.failure_desc or '' }}{% if m.notes %}<small>{{ m.notes }}</small>{% endif %}</td>
+    <td class="actions no-print">{% if m.id %}<a class="btn btn-small" href="{{ url_for('mold_mount', mold_id=mold.id, id=m.id) }}">Edytuj</a>{% if not m.prod_order_id %}<form method="post" action="{{ url_for('mold_mount_delete', mold_id=mold.id, mount_id=m.id) }}" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-small btn-danger" type="submit" data-confirm="Usunąć wpis z rejestru?">×</button></form>{% endif %}
+      {% else %}<a class="btn btn-small" href="{{ url_for('mold_mount', mold_id=mold.id, ref=m.stat_ref) }}">Uzupełnij</a>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="12" class="empty">Brak montaży.</td></tr>{% endfor %}
+  {% if mounts %}<tr class="total-row"><td colspan="2"><strong>Razem wtrysków</strong></td><td class="r"><strong>{{ mounts|selectattr('shots')|sum(attribute='shots')|n0 }}</strong></td><td colspan="9"></td></tr>{% endif %}
+  </tbody></table></div>
+  <div class="form-actions no-print"><span class="spacer"></span><a class="btn btn-secondary" href="{{ url_for('mold_mount', mold_id=mold.id) }}">+ Wpis: montaż / narzędziownia / awaria</a></div>
+</section>
+
+<section class="panel"><h2>Historia użyć — statystyka produkcji ({{ done|length }} wierszy kolorów)</h2>
+  <div class="table-scroll"><table class="analysis-table"><thead><tr><th>Od</th><th>Do</th><th>Zam. prod.</th><th>Szarża</th><th>Klient</th><th>Produkt</th><th class="r">Dobre szt.</th><th class="r">Braki</th><th class="r">Cykle</th><th>Masz.</th><th>Źródło</th></tr></thead><tbody>
+  {% for u in done %}<tr><td>{{ u.date_start|dt }}</td><td>{{ u.date_end|dt }}</td>
+    <td>{% if u.prod_color_id %}<a href="{{ url_for('settlement_color', color_id=u.prod_color_id) }}">{{ u.internal_order }}</a>{% else %}<a href="{{ url_for('stats_index', zam=u.internal_order) }}">{{ u.internal_order or '' }}</a>{% endif %}</td>
+    <td>{{ u.batch_code or '' }}</td><td>{{ u.short_name }}</td><td>{{ u.product_name }}</td><td class="r">{{ u.qty|n0 }}</td><td class="r">{{ u.scrap_pcs|n0 if u.scrap_pcs is not none else '' }}</td>
+    <td class="r">{{ u.cycles|n0 if u.cycles else '—' }}{% if u.plc_cycles is none and u.cycles %}<small>szac.</small>{% endif %}</td><td>{{ u.machine_no or '—' }}</td>
+    <td><span class="badge {{ 'badge-material' if u.source == 'ROZLICZENIE' else 'badge-color' }}">{{ 'rozliczenie' if u.source == 'ROZLICZENIE' else 'Excel' }}</span></td></tr>
+  {% else %}<tr><td colspan="11" class="empty">Brak użyć w produkcji.</td></tr>{% endfor %}
+  {% if done %}<tr class="total-row"><td colspan="6"><strong>Razem</strong></td><td class="r"><strong>{{ summary.qty|n0 }}</strong></td><td class="r"><strong>{{ summary.scrap|n0 }}</strong></td><td class="r"><strong>{{ summary.cycles|n0 }}</strong></td><td colspan="2"></td></tr>{% endif %}
+  </tbody></table></div>
+  <p class="muted catalog-hint">Cykle: licznik PLC z rozliczenia; dla historii z Excela szacunek (dobre + braki) ÷ krotność.</p>
+  {% if prod_orders or planned %}<h3 class="photo-group">Zaplanowane</h3><div class="table-scroll"><table class="analysis-table"><thead><tr><th>Start</th><th>Zamówienie</th><th>Produkt</th><th class="r">Ilość</th><th>Maszyna</th><th>Status</th></tr></thead><tbody>
+  {% for p in prod_orders %}<tr><td>{{ p.planned_start|dt }}</td><td><a href="{{ url_for('settlement_order', order_id=p.id) }}">{{ p.number }}</a>{% if p.batch_code %}<small>{{ p.batch_code }}</small>{% endif %}</td><td>{{ p.product_name }}</td><td class="r">{{ p.qty_total|n0 }}</td><td>{{ p.machine_no or '—' }}</td><td>{{ p.status|lower }}</td></tr>{% endfor %}
+  {% for u in planned %}<tr><td>{{ u.date_start|dt }}</td><td><a href="{{ url_for('order_detail', order_id=u.order_id) }}"><span class="code zk-code">{{ u.number }}</span></a></td><td>{{ u.product_name }}</td><td class="r">{{ u.qty|n0 }}</td><td>{{ u.machine_no or '—' }}</td><td>ZK przyjęte</td></tr>{% endfor %}
+  </tbody></table></div>{% endif %}
+</section>
+
+<section class="panel" id="dziennik"><h2>Dziennik serwisowy — przeglądy, naprawy, modyfikacje ({{ events|length }})</h2>
+  <form method="post" class="event-form no-print" action="{{ url_for('mold_event', mold_id=mold.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid doc-meta">
+      <label>Data<input type="date" name="event_date" value="{{ today.isoformat() }}" required></label>
+      <label>Rodzaj<select name="event_type">{% for t in mold_event_types %}<option>{{ t }}</option>{% endfor %}</select></label>
+      <label>Wykonał(a)<input name="performed_by"></label>
+      <label>Licznik cykli<input name="cycles_at" value="{{ summary.counter or '' }}" inputmode="numeric"></label>
+      <label class="span-2">Opis prac *<input name="description" required placeholder="np. czyszczenie odpowietrzeń, wymiana wypychacza Ø4"></label>
+      <label>Koszt [zł]<input name="cost_pln" inputmode="decimal"></label>
+      <label>Przestój [h]<input name="downtime_h" inputmode="decimal"></label>
+      <label>Zmień status formy<select name="new_status"><option value="">— bez zmiany —</option>{% for s in mold_statuses %}<option>{{ s }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="form-actions"><span class="spacer"></span><button class="btn btn-primary" type="submit">Dodaj wpis</button></div>
+  </form>
+  <div class="table-scroll"><table class="analysis-table"><thead><tr><th>Data</th><th>Rodzaj</th><th>Opis</th><th>Wykonał</th><th class="r">Licznik</th><th class="r">Koszt zł</th><th class="r">Przestój h</th><th class="no-print"></th></tr></thead><tbody>
+  {% for e in events %}<tr><td>{{ e.event_date|dt }}</td><td><span class="badge {{ 'badge-color' if e.event_type == 'NAPRAWA' else 'badge-material' }}">{{ e.event_type|lower }}</span></td><td>{{ e.description }}</td><td>{{ e.performed_by or '—' }}</td>
+    <td class="r">{{ e.cycles_at|n0 if e.cycles_at else '—' }}</td><td class="r">{{ e.cost_pln|num if e.cost_pln else '—' }}</td><td class="r">{{ e.downtime_h|num if e.downtime_h else '—' }}</td>
+    <td class="actions no-print"><form method="post" action="{{ url_for('mold_event', mold_id=mold.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-small btn-danger" type="submit" name="delete" value="{{ e.id }}" data-confirm="Usunąć wpis z dziennika?">Usuń</button></form></td></tr>
+  {% else %}<tr><td colspan="8" class="empty">Brak wpisów. Dodaj przegląd lub naprawę — licznik „do przeglądu” liczy się od ostatniego przeglądu.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+<script src="{{ url_for('static', filename='orders.js') }}" defer></script>
+{% endblock %}

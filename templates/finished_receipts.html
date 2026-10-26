@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Przyjęcia wyrobów · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Rozliczenie produkcji{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Dok. 10 · zestawienie miesięczne</div><h1>Przyjęcie wyrobów na magazyn</h1>
+  <p class="muted">Lewa część (Plastema): data, klient, zamówienie, detal z kolorem, ilość. Prawa część (magazyn): godzina, nr PW, kto przyjął. K10: przyjęta ilość = ilość w statystyce.</p></div>
+  <button class="btn btn-secondary no-print" type="button" data-print>Drukuj zestawienie</button></section>
+<form class="filters no-print" method="get"><label><span>Miesiąc</span><input type="month" name="miesiac" value="{{ month }}"></label><button class="btn btn-secondary" type="submit">Pokaż</button></form>
+<div class="table-card"><div class="table-scroll"><table><thead><tr><th>Lp.</th><th>Data</th><th>Klient</th><th>Nr zam.</th><th>Detal — kolor</th><th class="r">Ilość szt.</th><th>Godz.</th><th>Nr PW</th><th>Przyjął</th><th class="r">Statystyka</th></tr></thead><tbody>
+{% for r in receipts %}<tr><td>{{ loop.index }}</td><td>{{ r.receipt_date|dt }}</td><td>{{ r.short_name }}</td><td>{{ r.number }}</td>
+  <td><a href="{{ url_for('settlement_color', color_id=r.color_id) }}">{{ r.product_name }} — {{ r.color_name }}</a></td><td class="r qty">{{ r.qty|n0 }}</td>
+  <td>{{ r.receipt_time or '' }}</td><td><span class="code">{{ r.pw_number }}</span></td><td>{{ r.received_by or '' }}</td>
+  <td class="r {{ 'minus' if r.stat_qty is not none and r.color_received|int != r.stat_qty|int else '' }}">{{ r.stat_qty|n0 if r.stat_qty is not none else '—' }}{% if r.stat_qty is not none and r.color_received|int != r.stat_qty|int %}<small>przyjęto łącznie {{ r.color_received|n0 }}</small>{% endif %}</td></tr>
+{% else %}<tr><td colspan="10" class="empty">Brak przyjęć w tym miesiącu.</td></tr>{% endfor %}
+</tbody></table></div></div>
+<section class="panel no-print"><h2>K10 — rozliczone kolory z różnicą przyjęcia ({{ open_items|length }})</h2>
+  <div class="table-scroll"><table class="analysis-table"><thead><tr><th>Koniec</th><th>Klient</th><th>Zam.</th><th>Detal — kolor</th><th class="r">Statystyka</th><th class="r">Przyjęto</th><th class="r">Różnica</th></tr></thead><tbody>
+  {% for r in open_items %}<tr><td>{{ r.end_date|dt }}</td><td>{{ r.short_name }}</td><td>{{ r.number }}</td><td><a href="{{ url_for('settlement_color', color_id=r.color_id) }}#przyjecie">{{ r.product_name }} — {{ r.color_name }}</a></td>
+    <td class="r">{{ r.stat_qty|n0 }}</td><td class="r">{{ r.received|n0 }}</td><td class="r minus">{{ (r.received - r.stat_qty)|n0 }}</td></tr>
+  {% else %}<tr><td colspan="7" class="empty">Wszystkie rozliczone kolory są przyjęte w całości.</td></tr>{% endfor %}</tbody></table></div></section>
+<script src="{{ url_for('static', filename='orders.js') }}" defer></script>
+{% endblock %}

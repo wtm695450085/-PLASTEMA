@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Plastema{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+  <link rel="preload" href="{{ url_for('static', filename='fonts/inter-latin.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='shell.css') }}">
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
+</head>
+<body class="{% block body_class %}{% endblock %}{% if not session.get('authenticated') %} no-shell{% endif %}">
+{% if session.get('authenticated') %}
+  <div class="shell">
+    <aside class="sidebar" id="sidebar" aria-label="Menu główne">
+      <div class="sb-head">
+        <a class="sb-brand" href="{{ url_for('dashboard') }}" title="Plastema">
+          {{ logo(34) }}
+          <span class="sb-brand-text"><b>PLASTEMA</b><small>Magazyn surowców</small></span>
+        </a>
+        <button class="icon-btn sb-toggle" type="button" data-sidebar-toggle aria-label="Zwiń menu" title="Zwiń menu">{{ icon('panel', 18) }}</button>
+      </div>
+      <div class="sb-search">
+        <button class="sb-search-rail icon-btn" type="button" data-search-open aria-label="Szukaj">{{ icon('search', 17) }}</button>
+        <label class="sb-search-box">
+          {{ icon('search', 15) }}
+          <input type="search" id="nav-search" placeholder="Szukaj…" autocomplete="off" aria-label="Szukaj w menu">
+          <kbd>⌘K</kbd>
+        </label>
+      </div>
+      <nav class="sb-nav" id="sb-nav">
+        <div class="sb-top">
+          {% for item in nav_top %}
+          <a class="sb-item{% if item.active %} is-active{% endif %}" href="{{ item.href }}" data-label="{{ item.label }}" title="{{ item.label }}">{{ icon(item.icon, 20) }}<span>{{ item.label }}</span></a>
+          {% endfor %}
+        </div>
+        {% for section in nav_sections %}
+        <div class="sb-section{% if section.has_active %} has-active{% endif %}" data-section="{{ section.key }}">
+          <button class="sb-section-head" type="button" aria-expanded="true" title="{{ section.title }}">
+            {{ icon(section.icon, 20) }}<span>{{ section.title }}</span>{{ icon('chevron-down', 16) }}
+          </button>
+          <div class="sb-section-body">
+            {% for item in section['items'] %}
+            <a class="sb-item sb-sub{% if item.active %} is-active{% endif %}" href="{{ item.href }}" data-label="{{ item.label }}">{{ icon(item.icon, 18) }}<span>{{ item.label }}</span></a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+        <p class="sb-empty" hidden>Brak wyników.</p>
+      </nav>
+      <div class="sb-user">
+        <span class="avatar">{{ ui_user.initials }}</span>
+        <span class="sb-user-text"><strong>{{ ui_user.name }}</strong><small>{{ ui_user.role }}</small></span>
+        <form method="post" action="{{ url_for('logout') }}" class="sb-logout">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="icon-btn" type="submit" aria-label="Wyloguj" title="Wyloguj">{{ icon('logout', 18) }}</button>
+        </form>
+      </div>
+    </aside>
+    <div class="sb-backdrop" data-sidebar-close></div>
+    <div class="main-col">
+      <header class="appbar">
+        <button class="icon-btn top-toggle" type="button" data-sidebar-toggle aria-label="Pokaż menu" title="Pokaż menu">{{ icon('panel', 18) }}</button>
+        <nav class="crumbs" aria-label="Okruszki">{% block page_title %}{% for c in (nav_crumbs or ['Plastema']) %}{% if not loop.first %}{{ icon('chevron-right', 14) }}{% endif %}<span{% if loop.first %} class="crumb-root"{% endif %}>{{ c }}</span>{% endfor %}{% endblock %}</nav>
+        <div class="top-actions">
+          <button class="icon-btn" type="button" id="theme-toggle" aria-label="Zmień jasność" title="Zmiana jasności">
+            <span class="ic-light">{{ icon('sun', 17) }}</span><span class="ic-dark">{{ icon('moon', 17) }}</span>
+          </button>
+          <div class="dd" data-dd>
+            <button class="lang-btn" type="button" data-dd-toggle aria-haspopup="true" aria-expanded="false"><b>PL</b>{{ icon('chevron-down', 13) }}</button>
+            <div class="dd-menu" role="menu" hidden>
+              <button class="dd-opt is-selected" type="button" role="menuitem"><em>PL</em><span>Polski</span>{{ icon('check', 15) }}</button>
+              <button class="dd-opt is-disabled" type="button" role="menuitem" disabled title="Wersja angielska — wkrótce"><em>EN</em><span>English</span></button>
+            </div>
+          </div>
+          <div class="dd" data-dd>
+            <button class="icon-btn" type="button" data-dd-toggle aria-haspopup="true" aria-expanded="false" aria-label="Powiadomienia">{{ icon('bell', 17) }}{% if attention_total %}<i class="bell-dot"></i>{% endif %}</button>
+            <div class="dd-menu dd-notif" role="menu" hidden>
+              <div class="dd-title">Powiadomienia</div>
+              <a class="dd-empty" href="{{ url_for('dashboard') }}">{% if attention_total %}Wymaga uwagi: {{ attention_total }}{% else %}Wszystkie powiadomienia{% endif %}</a>
+            </div>
+          </div>
+          <span class="avatar avatar-top" title="{{ ui_user.name }}">{{ ui_user.initials }}</span>
+        </div>
+      </header>
+{% endif %}
+      <main class="page{% if not session.get('authenticated') %} page-auth{% endif %}">
+        {% if not session.get('authenticated') %}
+        <a class="auth-brand" href="{{ url_for('login') }}">{{ logo(38) }}<span class="sb-brand-text"><b>PLASTEMA</b><small>Magazyn surowców</small></span></a>
+        {% endif %}
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+          <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+        {% block content %}{% endblock %}
+      </main>
+{% if session.get('authenticated') %}
+    </div>
+  </div>
+{% endif %}
+<script src="{{ url_for('static', filename='app.js') }}" defer></script>
+<script src="{{ url_for('static', filename='shell.js') }}" defer></script>
+</body>
+</html>

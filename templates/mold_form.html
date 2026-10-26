@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ ('Forma ' ~ mold.mold_no) if mold_id else 'Nowa forma' }} · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Formy wtryskowe{% endblock %}
+{% block content %}
+<div class="form-heading"><div><a class="back" href="{{ url_for('mold_passport', mold_id=mold_id) if mold_id else url_for('molds_index') }}">← {{ 'Paszport formy' if mold_id else 'Formy wtryskowe' }}</a>
+  <div class="eyebrow">Paszport formy wtryskowej</div><h1>{{ ('Forma ' ~ mold.mold_no ~ ' — edycja paszportu') if mold_id else 'Nowa forma' }}</h1>
+  {% if not mold_id %}<p class="muted">Kod formy EEE został zaproponowany jako kolejny wolny numer. Po zapisaniu dodasz zdjęcia formy i detalu.</p>{% endif %}</div></div>
+<form method="post" class="supplier-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{% for title, fields in sections %}
+<section class="form-section"><h2>{{ title }}</h2><div class="form-grid doc-meta">
+  {% for col, label, kind, opt in fields %}{% set v = mold[col] if mold[col] is not none else '' %}
+  <label class="{{ 'span-2' if col in ('name', 'connections', 'slides', 'inserts', 'surface', 'trade_name', 'service_plan') else '' }}">{{ label }}
+    {% if kind == 'code' %}<input class="code-input mold-code-input" name="{{ col }}" value="{{ v }}" maxlength="3" pattern="[0-9]{1,3}" required>
+    {% elif kind == 'select' %}<select name="{{ col }}">{% for o in opt %}<option value="{{ o }}" {% if v == o %}selected{% endif %}>{{ spi_classes.get(o, o) if col == 'spi_class' else (o or '—') }}</option>{% endfor %}{% if v and v not in opt %}<option selected>{{ v }}</option>{% endif %}</select>
+    {% elif kind == 'client' %}<select name="{{ col }}"><option value="">—</option>{% for c in clients %}<option value="{{ c.id }}" {% if v|string == c.id|string %}selected{% endif %}>{{ c.code }} · {{ c.short_name }}</option>{% endfor %}</select>
+    {% elif kind == 'date' %}<input type="date" name="{{ col }}" value="{{ v.isoformat() if v and v.isoformat is defined else v }}">
+    {% elif kind in ('int', 'num') %}<input name="{{ col }}" value="{{ v|num if v is number and kind == 'num' else v }}" inputmode="decimal">
+    {% elif kind == 'area' %}<textarea name="{{ col }}" rows="3" placeholder="np. co 50 000 cykli: czyszczenie odpowietrzeń, kontrola wypychaczy i prowadzeń, smarowanie">{{ v }}</textarea>
+    {% else %}<input name="{{ col }}" value="{{ v }}" {% if opt %}placeholder="{{ opt }}"{% endif %} {% if col == 'name' %}required{% endif %}>{% endif %}
+  </label>{% endfor %}
+</div></section>
+{% endfor %}
+<section class="form-section"><h2>Uwagi</h2><textarea name="notes" rows="6" placeholder="Uwagi dla ustawiacza i narzędziowni: kolejność montażu, znane problemy, zalecenia…">{{ mold.notes or '' }}</textarea></section>
+<div class="form-actions">{% if mold_id %}<button class="btn btn-danger" type="button" data-delete-form="delete-mold" data-confirm="Usunąć formę? Możliwe tylko, gdy nie ma produktów ani historii produkcji.">Usuń formę</button>{% endif %}<span class="spacer"></span><a class="btn btn-ghost" href="{{ url_for('mold_passport', mold_id=mold_id) if mold_id else url_for('molds_index') }}">Anuluj</a><button class="btn btn-primary" type="submit">Zapisz paszport</button></div>
+</form>
+{% if mold_id %}<form id="delete-mold" method="post" action="{{ url_for('mold_delete', mold_id=mold_id) }}" hidden><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>{% endif %}
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Różnica {{ line.material_index }} · {{ inventory.number }} · Plastema{% endblock %}
+{% block content %}
+{% set short = line.diff < 0 %}
+<div class="form-heading"><div><div class="eyebrow">Wyjaśnienie różnicy inwentaryzacyjnej · {{ inventory.number }} · {{ inventory.count_date.strftime('%d.%m.%Y') }}</div>
+  <h1><span class="code material-code">{{ line.material_index }}</span> {{ line.internal_name or line.symbol }}</h1>
+  <p class="muted">{{ line.supplier or '' }}{% if line.color %} · {{ line.color }}{% endif %}</p></div>
+  <a class="back" href="{{ url_for('inventory_sheet', inventory_id=inventory.id) }}#line-{{ line.id }}">← Arkusz spisu</a></div>
+
+<section class="diff-hero {{ 'diff-short' if short else 'diff-surplus' }}">
+  <div class="diff-main"><span>{{ 'BRAK' if short else 'NADWYŻKA' }}</span><strong>{{ '+' if line.diff > 0 else '' }}{{ line.diff|num }} kg</strong><em>{{ line.diff_pct|num }}% względem poprzedniego stanu</em></div>
+  <div class="diff-main"><span>Wartość różnicy</span><strong>{% if line.diff_value is not none %}{{ '+' if line.diff_value > 0 else '' }}{{ line.diff_value|num }} zł{% else %}brak ceny{% endif %}</strong><em>cena {{ line.unit_price|num }} zł/kg</em></div>
+  <dl class="diff-facts"><div><dt>Poprzedni stan</dt><dd>{{ line.expected_kg|num }} kg</dd></div><div><dt>Policzono</dt><dd>{{ line.counted_kg|num }} kg</dd></div><div><dt>Próg alarmu</dt><dd>{{ threshold|num }}%</dd></div></dl>
+</section>
+
+<form class="supplier-form" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <section class="form-section"><h2>Powód różnicy</h2>
+    <div class="reason-list" role="radiogroup" aria-label="Powód różnicy">
+      {% for key, label in reasons.items() %}<label class="reason-option"><input type="radio" name="diff_reason" value="{{ key }}" {% if line.diff_reason == key %}checked{% endif %} required><span>{{ label }}</span></label>{% endfor %}
+    </div>
+  </section>
+  <section class="form-section"><h2>Wyjaśnienie</h2>
+    <label><span>Opis: co się stało, kto i kiedy potwierdził, jakie dokumenty (WZ, PZ, zlecenie)</span>
+      <textarea class="explain-area" name="diff_explanation" rows="12" placeholder="Opisz szczegółowo przyczynę różnicy…">{{ line.diff_explanation or '' }}</textarea></label>
+    <label><span>Wyjaśnił(a)</span><input name="diff_explained_by" value="{{ line.diff_explained_by or inventory.counted_by or '' }}" placeholder="imię i nazwisko"></label>
+    {% if line.diff_explained_at %}<p class="muted">Ostatnio zapisano: {{ line.diff_explained_at.strftime('%d.%m.%Y %H:%M') }}</p>{% endif %}
+  </section>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">Zapisz wyjaśnienie</button>
+    {% if pending %}<button class="btn btn-secondary" type="submit" name="then" value="next">Zapisz i następna ({{ pending }} do wyjaśnienia)</button>{% endif %}
+    <a class="btn" href="{{ url_for('inventory_sheet', inventory_id=inventory.id) }}#line-{{ line.id }}">Anuluj</a></div>
+</form>
+{% endblock %}

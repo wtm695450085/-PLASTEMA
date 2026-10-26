@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name or 'Nowy produkt' }} · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Zamówienia{% endblock %}
+{% block content %}
+<div class="page-head"><a class="back-btn" href="{{ url_for('products_index') }}" aria-label="Produkty" title="Produkty">{{ icon('arrow-left', 18) }}</a>
+  <div><div class="ph-title"><h1>{{ product.name if product_id else 'Nowy produkt' }}</h1>{% if product_id and product.code %}<span class="chip-code">{{ product.code }}</span>{% endif %}</div>
+  <p class="muted">Kod produktu BBBB wchodzi do kodu produkcji AAA-BBBB-CCC. Forma, tworzywo i barwnik są sprawdzane przy każdym zamówieniu.</p></div></div>
+<form method="post" class="supplier-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<section class="form-section"><h2>Identyfikacja</h2><div class="form-grid">
+  <label>Kod produktu BBBB *<input name="code" value="{{ product.code or '' }}" inputmode="numeric" required></label>
+  <label>Klient *<select name="client_id" required><option value="">— wybierz —</option>{% for c in clients %}<option value="{{ c.id }}" {% if product.client_id|string == c.id|string %}selected{% endif %}>{{ c.code }} · {{ c.short_name }}</option>{% endfor %}</select></label>
+  <label class="span-2">Nazwa produktu *<input name="name" value="{{ product.name or '' }}" required></label>
+  <label>Kolor CCC<select name="color_id"><option value="">— brak —</option>{% for c in colors %}<option value="{{ c.id }}" {% if product.color_id|string == c.id|string %}selected{% endif %}>{{ c.code }} {{ c.name }}</option>{% endfor %}</select></label>
+  <label>Nr wzoru produkcyjnego<input name="pattern_no" value="{{ product.pattern_no or '' }}"></label>
+</div></section>
+<section class="form-section"><h2>Forma i materiały (EEE · FFF · GGG)</h2><div class="form-grid">
+  <label>Forma wtryskowa EEE<select name="mold_id"><option value="">— brak formy —</option>{% for m in molds %}<option value="{{ m.id }}" {% if product.mold_id|string == m.id|string %}selected{% endif %}>{{ m.mold_no }} {{ m.name }}{% if m.status != 'SPRAWNA' %} [{{ m.status }}]{% endif %}</option>{% endfor %}</select></label>
+  <div class="mold-confirm">{% if product.mold_match == 'AUTO' %}<input type="hidden" name="mold_auto" value="1"><label class="check-inline"><input type="checkbox" name="mold_confirm" value="1"> Potwierdzam formę (przypisana automatycznie po nazwie)</label>{% elif product.mold_match == 'POTWIERDZONA' %}<span class="badge badge-material">forma potwierdzona</span>{% endif %}</div>
+  <label>Tworzywo SS (FFF)<select name="material_id"><option value="">— nie powiązano —</option>{% for m in ss %}<option value="{{ m.id }}" {% if product.material_id|string == m.id|string %}selected{% endif %}>{{ m.material_index }} {{ m.name }}</option>{% endfor %}</select></label>
+  <label>Tworzywo wg raportu produkcyjnego<input name="material_text" value="{{ product.material_text or '' }}"></label>
+  <label>Barwnik BT (GGG)<select name="colorant_id"><option value="">— bez barwnika / nie powiązano —</option>{% for m in bt %}<option value="{{ m.id }}" {% if product.colorant_id|string == m.id|string %}selected{% endif %}>{{ m.material_index }} {{ m.symbol }} {{ m.color or '' }}</option>{% endfor %}</select></label>
+  <label>Barwnik wg raportu produkcyjnego<input name="colorant_text" value="{{ product.colorant_text or '' }}"></label>
+  <label>Dozowanie barwnika [%]<input name="colorant_pct" value="{{ product.colorant_pct|num if product.colorant_pct is number else (product.colorant_pct or '') }}" inputmode="decimal"></label>
+</div></section>
+<section class="form-section"><h2>Parametry produkcji</h2><div class="form-grid doc-meta">
+  <label>Waga netto 1 szt. [g]<input name="net_g" value="{{ product.net_g if product.net_g is not none else '' }}" inputmode="decimal"></label>
+  <label>Waga brutto 1 szt. [g]<input name="gross_g" value="{{ product.gross_g if product.gross_g is not none else '' }}" inputmode="decimal"></label>
+  <label>Krotność formy (gniazda)<input name="cavities" value="{{ product.cavities if product.cavities is not none else '' }}" inputmode="numeric"></label>
+  <label>Czas cyklu [s]<input name="cycle_s" value="{{ product.cycle_s if product.cycle_s is not none else '' }}" inputmode="decimal"></label>
+  <label>Średnio detali / zmianę 8 h<input name="per_shift" value="{{ product.per_shift if product.per_shift is not none else '' }}" inputmode="numeric"></label>
+  <label>Wtryskarki (nr, np. 2, 7)<input name="machines" value="{{ product.machines or '' }}"></label>
+  <label>Ilość w kartonie<input name="pcs_per_carton" value="{{ product.pcs_per_carton if product.pcs_per_carton is not none else '' }}" inputmode="numeric"></label>
+  <label>Rodzaj kartonu<input name="carton_type" value="{{ product.carton_type or '' }}"></label>
+  <label>Waga kartonu [kg]<input name="carton_kg" value="{{ product.carton_kg if product.carton_kg is not none else '' }}" inputmode="decimal"></label>
+  <label class="span-2">Uwagi<input name="notes" value="{{ product.notes or '' }}"></label>
+</div>{% if product.produced_total %}<p class="muted catalog-hint">Historia: {{ product.orders_count }} zleceń, {{ product.produced_total|n0 }} szt., od {{ product.first_production|dt }} do {{ product.last_production|dt }}.</p>{% endif %}</section>
+<div class="form-actions">{% if product_id %}<button class="btn btn-danger" type="button" data-delete-form="delete-product" data-confirm="Usunąć produkt? Możliwe tylko, gdy nie występuje w zamówieniach.">Usuń produkt</button>{% endif %}<span class="spacer"></span><a class="btn btn-ghost" href="{{ url_for('products_index') }}">Anuluj</a><button class="btn btn-primary" type="submit">Zapisz produkt</button></div>
+</form>
+{% if product_id %}<form id="delete-product" method="post" action="{{ url_for('product_delete', product_id=product_id) }}" hidden><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>
+<section class="panel contacts-section"><h2>Zamówienia z tym produktem</h2><div class="table-scroll"><table class="analysis-table"><thead><tr><th>Kod zamówienia</th><th>Data</th><th>Status</th><th class="r">Ilość</th><th>Kod produkcji</th></tr></thead><tbody>
+{% for h in history %}<tr><td><a href="{{ url_for('order_detail', order_id=h.id) }}"><span class="code zk-code">{{ h.number }}</span></a></td><td>{{ h.order_date|dt }}</td><td><span class="status status-{{ h.status|replace(' ', '-')|lower }}">{{ h.status|lower }}</span></td><td class="r">{{ h.qty|n0 }}</td><td>{{ h.production_code or '—' }}</td></tr>
+{% else %}<tr><td colspan="5" class="empty">Brak zamówień — to będzie nowa para klient–produkt.</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
+{% endblock %}

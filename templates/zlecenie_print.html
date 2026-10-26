@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Zamówienie produkcji {{ order.number }} · Plastema{% endblock %}
+{% block body_class %}theme-blue order-print-page{% endblock %}
+{% block module_name %}PLASTEMA · Zamówienia produkcji{% endblock %}
+{% block content %}
+<div class="mail-bar no-print"><button class="btn btn-primary" type="button" data-print>Drukuj</button>
+  <a class="btn" href="{{ url_for('settlement_order', order_id=order.id) }}">← Wróć do zlecenia</a><a class="btn" href="{{ url_for('machine_plan') }}">Plan produkcji — 9 wtryskarek</a></div>
+<div class="op-sheet od-doc">
+  <header class="op-head">
+    <div><b class="op-brand">PLASTEMA</b><span>Zamówienie produkcji na realizację produkcji</span></div>
+    <div class="od-no"><strong>{{ order.number }}</strong>{% if order.batch_code %}<img src="{{ barcode_uri(order.batch_code, 0.4, 10) }}" alt="">{% endif %}</div>
+  </header>
+  <div class="zp-client"><span>Klient</span><strong>{{ order.client_name }}</strong><em>{{ order.short_name }} · kod {{ order.client_code }}</em></div>
+  <p class="op-note">Zlecenie wystawione automatycznie przy nadaniu kodu produkcji{% if zk %} (przyjęcie zamówienia klienta <strong>{{ zk.number }}</strong>{% if zk.client_ref %}, nr klienta {{ zk.client_ref }}{% endif %}){% endif %}. Podstawa do wydania surowca na maszynę (WM), produkcji i rozliczenia.</p>
+  <dl class="od-meta">
+    <div><dt>Klient</dt><dd>{{ order.client_name }} ({{ order.short_name }}, {{ order.client_code }})</dd></div>
+    <div><dt>Data wystawienia</dt><dd>{{ order.order_date|dt }}</dd></div>
+    <div><dt>Produkt</dt><dd><strong>{{ order.product_name }}</strong></dd></div>
+    <div><dt>Ilość łącznie</dt><dd><strong>{{ order.qty_total|n0 }} szt.</strong></dd></div>
+    <div><dt>Wtryskarka</dt><dd>{{ order.machine_no or '—' }}</dd></div>
+    <div><dt>Forma (EEE)</dt><dd>{{ order.mold_no or '—' }} {{ order.mold_name or '' }}{% if order.mold_storage %} (pole {{ order.mold_storage }}){% endif %}</dd></div>
+    <div><dt>Planowana realizacja</dt><dd>{{ order.planned_start|dt if order.planned_start else '—' }} – {{ order.planned_end|dt if order.planned_end else '—' }}</dd></div>
+    <div><dt>Termin dostawy</dt><dd>{{ zk.delivery_date|dt if zk and zk.delivery_date else '—' }}</dd></div>
+    <div><dt>Tworzywo (FFF)</dt><dd>{{ order.material_index or '' }} {{ order.material_name or order.material_text or '—' }}{% if order.material_kg %} — {{ order.material_kg|num }} kg{% endif %}</dd></div>
+    <div><dt>Karton</dt><dd>{{ order.pcs_per_carton|n0 if order.pcs_per_carton else '—' }} szt. {{ order.carton_type or '' }}</dd></div>
+  </dl>
+  {% for c in colors %}
+  <section class="op-line">
+    <div class="op-line-head"><span class="op-lp">{{ c.lp }}</span><strong>{{ c.color_name }}</strong>
+      <span class="op-qty">{{ c.qty_ordered|n0 }} szt.{% if c.colorant_symbol %} · barwnik {{ c.colorant_symbol }}{% if c.dosage_pct is not none %} {{ c.dosage_pct|num }}%{% endif %}{% endif %}</span></div>
+    {% if c.codes.production %}
+    <figure class="op-code"><figcaption>Kod produkcji AAA-BBBB-CCC</figcaption><img src="{{ barcode_uri(c.codes.production, 1.2, 22) }}" alt=""><div>{{ c.codes.production }}</div></figure>
+    <figure class="op-code"><figcaption>Pełny kod AAA-BBBB-CCC-EEE-FFF-GGG</figcaption><img src="{{ barcode_uri(c.codes.full, 0.8, 22) }}" alt=""><div>{{ c.codes.full }}</div></figure>
+    {% if order.batch_code %}<figure class="op-code"><figcaption>Kod szarży N-Z-S-DDMMRR</figcaption><img src="{{ barcode_uri(order.batch_code, 1.2, 22) }}" alt=""><div>{{ order.batch_code }}</div></figure>{% endif %}
+    {% else %}<p class="muted">Brak kodu produkcji — kolor bez przypisanego produktu.</p>{% endif %}
+  </section>{% endfor %}
+  {% if order.notes %}<p class="op-note">Uwagi: {{ order.notes }}</p>{% endif %}
+  <table class="od-table sign-table"><tbody><tr><th>Wystawił</th><td>{{ order.issued_by or '' }}</td><th>Przyjął do realizacji (podpis)</th><td>{{ order.accepted_by or '' }}</td></tr></tbody></table>
+  <footer class="op-foot">Wydrukowano {{ today|dt }} · {{ order.number }}</footer>
+</div>
+<script src="{{ url_for('static', filename='orders.js') }}" defer></script>
+{% endblock %}

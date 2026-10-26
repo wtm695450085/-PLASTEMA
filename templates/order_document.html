@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Zamówienie {{ order.number }} · Plastema{% endblock %}
+{% block body_class %}theme-blue order-print-page{% endblock %}
+{% block module_name %}PLASTEMA · Zamówienia{% endblock %}
+{% block content %}
+<div class="mail-bar no-print"><button class="btn btn-primary" type="button" data-print>Drukuj</button><a class="btn" href="{{ url_for('order_detail', order_id=order.id) }}">← Wróć do zamówienia</a></div>
+<div class="op-sheet od-doc">
+  <header class="op-head">
+    <div><b class="op-brand">PLASTEMA</b><span>Potwierdzenie zamówienia</span></div>
+    <div class="od-no"><strong>{{ order.number }}</strong><img src="{{ barcode_uri(order.number, 0.4, 10) }}" alt=""></div>
+  </header>
+  <dl class="od-meta">
+    <div><dt>Klient</dt><dd>{{ order.client_name }} ({{ order.short_name }})</dd></div>
+    <div><dt>Data złożenia</dt><dd>{{ order.order_date|dt }}</dd></div>
+    <div><dt>Żądany termin</dt><dd>{{ order.requested_date|dt if order.requested_date else '—' }}</dd></div>
+    <div><dt>Data dostawy</dt><dd>{{ order.delivery_date|dt if order.delivery_date else '—' }}</dd></div>
+    <div><dt>Nr zamówienia klienta</dt><dd>{{ order.client_ref or '—' }}</dd></div>
+    <div><dt>Osoba zamawiająca</dt><dd>{{ order.ordered_by or '—' }}{% if order.ordered_email %}, {{ order.ordered_email }}{% endif %}</dd></div>
+    <div><dt>Kanał / odebrał(a)</dt><dd>{{ order.channel or '—' }} / {{ order.received_by or '—' }}</dd></div>
+    <div><dt>Status</dt><dd>{{ order.status|lower }}</dd></div>
+  </dl>
+  <table class="od-table">
+    <thead><tr><th>Lp.</th><th>Kod</th><th>Produkt</th><th>Kolor</th><th>Forma</th><th>Tworzywo</th><th>Barwnik</th><th class="r">Ilość [szt.]</th></tr></thead>
+    <tbody>
+    {% for l in lines %}<tr><td>{{ l.lp }}</td><td>{% if l.product_code %}{{ '%04d'|format(l.product_code) }}{% endif %}</td><td><strong>{{ l.product_name }}</strong>{% if l.notes %}<br><small>{{ l.notes }}</small>{% endif %}</td>
+      <td>{{ l.color_code or '' }} {{ l.color_name or '' }}</td><td>{{ l.mold_no or '' }} {{ l.mold_name or '' }}</td>
+      <td>{{ l.material_index or '' }} {{ l.material_name or l.material_text or '' }}</td>
+      <td>{{ l.colorant_index or '' }} {{ l.colorant_symbol or l.colorant_text or '' }}{% if l.colorant_pct and l.colorant_index %} {{ l.colorant_pct|num }}%{% endif %}</td>
+      <td class="r"><strong>{{ l.qty|n0 }}</strong></td></tr>
+    {% else %}<tr><td colspan="8">Zamówienie nie ma pozycji.</td></tr>{% endfor %}
+    </tbody>
+    <tfoot><tr><td colspan="7" class="r">Razem</td><td class="r"><strong>{{ total|n0 }}</strong></td></tr></tfoot>
+  </table>
+  {% if order.notes %}<p class="op-note">Uwagi: {{ order.notes }}</p>{% endif %}
+  <footer class="op-foot">Wydrukowano {{ today|dt }} · {{ order.number }}</footer>
+</div>
+<script src="{{ url_for('static', filename='orders.js') }}" defer></script>
+{% endblock %}

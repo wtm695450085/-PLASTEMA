@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Dokumenty magazynu wyrobów · Plastema{% endblock %}
+{% block body_class %}theme-teal{% endblock %}
+{% block module_name %}PLASTEMA · Magazyn wyrobów gotowych{% endblock %}
+{% block content %}
+<section class="hero"><div><a class="back" href="{{ url_for('fg_stock') }}">← Stan magazynu</a><div class="eyebrow">Magazyn wyrobów gotowych</div><h1>Dokumenty PW / WZ / ZW / INW-WG</h1>
+  <p class="muted">PW przyjmuje towar z produkcji. WZ wydaje towar do klienta (najlepiej z karty zamówienia ZK albo z listy „do wydania”). ZW przyjmuje zwrot. INW-WG koryguje stan po spisie.</p></div></section>
+<div class="doc-actions fg-new">
+  <form method="post" action="{{ url_for('fg_doc_new') }}" class="doc-action"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="doc_type" value="WZ">
+    <strong>Wydanie WZ</strong><small>ręcznie, bez zamówienia ZK</small><select name="client_id" required><option value="">— klient —</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.code }} · {{ c.short_name }}</option>{% endfor %}</select><button class="btn btn-small btn-primary" type="submit">Utwórz WZ</button></form>
+  <form method="post" action="{{ url_for('fg_doc_new') }}" class="doc-action doc-uzupelnienie"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="doc_type" value="ZW">
+    <strong>Zwrot od klienta ZW</strong><small>reklamacja, pomyłka w wysyłce</small><select name="client_id" required><option value="">— klient —</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.code }} · {{ c.short_name }}</option>{% endfor %}</select><button class="btn btn-small" type="submit">Utwórz ZW</button></form>
+  <form method="post" action="{{ url_for('fg_doc_new') }}" class="doc-action doc-zwrot"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="doc_type" value="INW">
+    <strong>Inwentaryzacja INW-WG</strong><small>arkusz z bieżącym stanem wszystkich szarż; pierwsza inwentaryzacja = bilans otwarcia</small><button class="btn btn-small" type="submit">Nowy arkusz spisu</button></form>
+</div>
+<form class="filters" method="get">
+  <label><span>Typ</span><select name="typ"><option value="">wszystkie</option>{% for k, m in fg_doc_types.items() %}<option value="{{ k }}" {% if doc_type == k %}selected{% endif %}>{{ m.label }}</option>{% endfor %}</select></label>
+  <label><span>Status</span><select name="status"><option value="">wszystkie</option><option value="OTWARTY" {% if status == 'OTWARTY' %}selected{% endif %}>otwarte</option><option value="ZREALIZOWANY" {% if status == 'ZREALIZOWANY' %}selected{% endif %}>zrealizowane</option></select></label>
+  <button class="btn btn-secondary" type="submit">Filtruj</button>
+</form>
+<div class="table-card"><div class="table-scroll"><table><thead><tr><th>Numer</th><th>Data</th><th>Klient</th><th>Zamówienie ZK</th><th class="r">Poz.</th><th class="r">Ilość</th><th>Przewoźnik</th><th>Status</th><th>Zrealizował</th><th></th></tr></thead><tbody>
+{% for d in docs %}<tr><td><span class="code">{{ d.number }}</span></td><td>{{ d.doc_date|dt }}</td><td>{{ d.short_name or '—' }}</td><td>{% if d.zk_order_id %}<a href="{{ url_for('order_detail', order_id=d.zk_order_id) }}">{{ d.zk_number }}</a>{% else %}—{% endif %}</td>
+  <td class="r">{{ d.lines }}</td><td class="r">{{ d.qty|n0 }}</td><td>{{ d.carrier or '' }}</td>
+  <td><span class="badge {{ 'badge-material' if d.status == 'ZREALIZOWANY' else 'badge-color' }}">{{ d.status|lower }}</span></td><td>{{ d.realized_by or '' }}</td>
+  <td class="actions"><a class="btn btn-small {{ '' if d.status == 'ZREALIZOWANY' else 'btn-primary' }}" href="{{ url_for('fg_doc', doc_id=d.id) }}">{{ 'Podgląd' if d.status == 'ZREALIZOWANY' else 'Otwórz' }}</a></td></tr>
+{% else %}<tr><td colspan="10" class="empty">Brak dokumentów.</td></tr>{% endfor %}</tbody></table></div></div>
+<section class="panel"><h2>Ostatnie przyjęcia z produkcji (PW)</h2><div class="table-scroll"><table class="analysis-table"><thead><tr><th>Data</th><th>PW</th><th>Klient</th><th>Produkt</th><th>Szarża</th><th>Miejsce</th><th class="r">Ilość</th></tr></thead><tbody>
+{% for p in pw %}<tr><td>{{ p.move_date|dt }}</td><td><a href="{{ url_for('settlement_color', color_id=p.color_id) }}#przyjecie">{{ p.pw_number }}</a></td><td>{{ p.short_name }}</td><td>{{ '%04d'|format(p.code) }} {{ p.name }}</td><td>{{ p.batch_code or '—' }}</td><td>{{ p.location or '' }}</td><td class="r qty">{{ p.qty|n0 }}</td></tr>
+{% else %}<tr><td colspan="7" class="empty">Brak przyjęć — PW dodaje się w rozliczeniu koloru.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

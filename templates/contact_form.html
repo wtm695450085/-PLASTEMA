@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · Magazyn surowców{% endblock %}
+{% block content %}
+<div class="form-heading"><div><a class="back" href="{{ url_for('supplier_contacts', supplier_id=supplier.id) }}">← Osoby kontaktowe dostawcy</a><h1>{{ title }}</h1><p class="muted">{{ supplier.name }} · {{ supplier.supplier_no or 'bez numeru' }}</p></div></div>
+<form method="post" class="supplier-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <section class="form-section"><h2>Dane kontaktowe</h2><div class="form-grid">
+    <label class="span-2">Osoba kontaktowa<input name="contact_name" value="{{ contact.contact_name or '' }}" autofocus></label>
+    <label>Telefon<input name="phone" value="{{ contact.phone or '' }}" type="tel"></label>
+    <label>E-mail<input name="email" value="{{ contact.email or '' }}" type="email"></label>
+    <label>Stanowisko<input name="position" value="{{ contact.position or '' }}"></label>
+    <label class="span-2">Uwagi<textarea name="notes" rows="4">{{ contact.notes or '' }}</textarea></label>
+  </div></section>
+  <div class="form-actions">
+    {% if contact.id %}<button class="btn btn-danger" type="button" data-delete-form="delete-contact-form">Usuń kontakt</button>{% endif %}
+    <span class="spacer"></span><a class="btn btn-ghost" href="{{ url_for('supplier_contacts', supplier_id=supplier.id) }}">Anuluj</a><button class="btn btn-primary" type="submit">Zapisz kontakt</button>
+  </div>
+</form>
+{% if contact.id %}<form id="delete-contact-form" method="post" action="{{ url_for('delete_contact', contact_id=contact.id) }}" hidden><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>{% endif %}
+{% endblock %}

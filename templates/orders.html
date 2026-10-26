@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Zamówienia · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Zamówienia{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Porządkowanie zamówień</div><h1>Zamówienia klientów</h1>
+  <p class="muted">Kod zamówienia <span class="code">ZK AAA RR MM DD NNN</span>: klient · rok · miesiąc · dzień · kolejne zamówienie klienta w roku.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('order_new') }}">+ Nowe zamówienie</a></section>
+
+<div class="stat-grid">
+  {% for key, label in order_statuses.items() %}
+  <a class="stat-card {{ 'stat-warn' if key == 'NOWE' and counts.get(key) else '' }}" href="{{ url_for('orders_index', status=key) }}"><span>{{ key }}</span><strong>{{ counts.get(key, 0) }}</strong><small>{{ label }}</small></a>
+  {% endfor %}
+</div>
+
+<form class="filters" method="get">
+  <label class="search"><span>Szukaj</span><input name="q" value="{{ query }}" placeholder="numer ZK, nr klienta, produkt, kod produkcji"></label>
+  <label><span>Klient</span><select name="klient"><option value="">Wszyscy</option>{% for c in clients %}<option value="{{ c.id }}" {% if client_id == c.id|string %}selected{% endif %}>{{ c.short_name }}</option>{% endfor %}</select></label>
+  <label><span>Status</span><select name="status"><option value="">Wszystkie</option>{% for key in order_statuses %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ key|lower }}</option>{% endfor %}</select></label>
+  <label><span>Od</span><input type="date" name="od" value="{{ date_from }}"></label>
+  <label><span>Do</span><input type="date" name="do" value="{{ date_to }}"></label>
+  <button class="btn btn-secondary" type="submit">Filtruj</button>
+  {% if query or client_id or status or date_from or date_to %}<a class="clear" href="{{ url_for('orders_index') }}">Wyczyść</a>{% endif %}
+</form>
+
+<div class="table-card"><div class="table-scroll"><table><thead><tr><th>Kod zamówienia</th><th>Klient</th><th>Złożone</th><th>Żądany termin</th><th>Plan. dostawa</th><th class="r">Poz.</th><th class="r">Ilość szt.</th><th>Status</th><th>Kanał</th><th></th></tr></thead><tbody>
+{% for o in orders %}<tr>
+  <td><span class="code zk-code">{{ o.number }}</span>{% if o.source_ref %}<small>{{ o.source_ref }}</small>{% elif o.client_ref %}<small>nr klienta: {{ o.client_ref }}</small>{% endif %}</td>
+  <td><strong>{{ o.short_name }}</strong><small>kod {{ o.client_code }}</small></td>
+  <td>{{ o.order_date|dt }}</td><td>{{ o.requested_date|dt }}</td>
+  <td>{% if o.delivery_date %}<strong>{{ o.delivery_date|dt }}</strong>{% else %}—{% endif %}</td>
+  <td class="r">{{ o.lines }}</td><td class="r">{{ o.qty|n0 }}</td>
+  <td><span class="status status-{{ o.status|replace(' ', '-')|lower }}">{{ o.status|lower }}</span></td>
+  <td><small>{{ o.channel or '—' }}</small></td>
+  <td class="actions"><a class="btn btn-small {{ 'btn-primary' if o.status == 'NOWE' else '' }}" href="{{ url_for('order_detail', order_id=o.id) }}">{{ 'Weryfikuj' if o.status == 'NOWE' else 'Otwórz' }}</a></td>
+</tr>{% else %}<tr><td colspan="10" class="empty">Brak zamówień spełniających kryteria.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% if orders|length == 600 %}<p class="muted catalog-hint">Pokazano pierwsze 600 zamówień — zawęź filtr.</p>{% endif %}
+{% endblock %}

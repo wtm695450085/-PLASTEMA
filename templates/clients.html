@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Klienci · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Zamówienia{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Baza klientów · kod AAA</div><h1>Klienci</h1>
+  <p class="muted">{{ clients|length }} klientów. Kod AAA jest wspólny z bazą produkcji (M2) i trafia do kodu zamówienia i kodu produkcji.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('client_form') }}">+ Nowy klient</a></section>
+<form class="filters" method="get"><label class="search"><span>Szukaj</span><input name="q" value="{{ query }}" placeholder="nazwa, kod, miasto, NIP, osoba kontaktowa"></label><button class="btn btn-secondary" type="submit">Szukaj</button>{% if query %}<a class="clear" href="{{ url_for('clients_index') }}">Wyczyść</a>{% endif %}</form>
+<div class="table-card"><div class="table-scroll"><table><thead><tr><th>AAA</th><th>Klient</th><th>Branża</th><th>Osoba kontaktowa</th><th>Telefon / e-mail</th><th>Miasto</th><th>NIP</th><th class="r">Produkty</th><th class="r">Zamówienia</th><th></th></tr></thead><tbody>
+{% for c in clients %}<tr>
+  <td><span class="code client-code">{{ c.code }}</span></td>
+  <td><strong>{{ c.short_name }}</strong><small>{{ c.name }}</small>{% if c.data_status and 'RZECZYWISTE' in c.data_status %}<small class="real-data">dane rzeczywiste (KRS)</small>{% endif %}</td>
+  <td><small>{{ c.industry or '—' }}</small></td>
+  <td>{{ c.contact_person or '—' }}<small>{{ c.contact_position or '' }}</small></td>
+  <td>{% if c.phone %}<a class="contact-link" href="tel:{{ c.phone|replace(' ', '') }}">{{ c.phone }}</a>{% endif %}{% if c.email %}<small><a class="contact-link" href="mailto:{{ c.email }}">{{ c.email }}</a></small>{% endif %}</td>
+  <td>{{ c.city or '—' }}<small>{{ c.voivodeship or '' }}</small></td><td>{{ c.nip or '—' }}</td>
+  <td class="r"><a href="{{ url_for('products_index', klient=c.id) }}">{{ c.products }}</a></td>
+  <td class="r"><a href="{{ url_for('orders_index', klient=c.id) }}">{{ c.orders }}</a></td>
+  <td class="actions"><a class="btn btn-small" href="{{ url_for('client_form', client_id=c.id) }}">Edytuj</a></td>
+</tr>{% else %}<tr><td colspan="10" class="empty">Brak klientów.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}{{ order.number }} {{ color.color_name }} · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Rozliczenie produkcji{% endblock %}
+{% block content %}
+{% set s = summary %}{% set settled = color.status == 'ROZLICZONY' %}{% set editable = not settled and order.status != 'ANULOWANE' %}
+{% set lvl = {'ok': 'ok', 'warn': 'warn', 'error': 'error'} %}
+<div class="form-heading"><div><a class="back" href="{{ url_for('settlement_order', order_id=order.id) }}">← Zamówienie produkcji {{ order.number }}</a>
+  <div class="eyebrow">Rozliczenie koloru · {{ order.short_name }} · wtryskarka {{ order.machine_no or '—' }} · forma {{ order.mold_no or '—' }}</div>
+  <h1>{{ order.product_name }} — {{ color.color_name }} <span class="status cstatus-{{ color.status|replace(' ', '-')|lower }}">{{ color.status|lower }}</span></h1>
+  <p class="muted">Barwnik {{ color.colorant_index or '—' }} {{ color.colorant_symbol or '' }}{% if color.dosage_pct is not none %} · {{ color.dosage_pct|num }}%{% endif %} · karton {{ order.pcs_per_carton or '?' }} szt. {{ order.carton_type or '' }} · krotność {{ order.cavities or 1 }}</p></div>
+  <div class="code-stack">
+    {% if color.codes.production %}<figure class="code-box code-prod"><span>Kod produkcji</span><strong>{{ color.codes.production }}</strong><small>{{ color.codes.full }}</small></figure>{% endif %}
+    {% if order.batch_code %}<figure class="code-box code-batch"><span>Kod szarży</span><strong>{{ order.batch_code }}</strong><img src="{{ barcode_uri(order.batch_code) }}" alt=""></figure>{% endif %}
+  </div></div>
+
+<div class="other-colors">{% for c in colors %}<a class="chip {{ 'active' if c.id == color.id else '' }} {{ 'done' if c.status == 'ROZLICZONY' else '' }} {{ 'x' if c.status == 'X' else '' }}" href="{{ url_for('settlement_color', color_id=c.id) }}">{{ c.color_name }}</a>{% endfor %}</div>
+
+<section class="trio">
+  <div><span>Ile miało być · dok. 3</span><strong>{{ s.ordered|n0 }}</strong><small>zamówiono koloru</small></div>
+  <div><span>Dobre sztuki · dok. 4 / 9</span><strong>{{ s.good|n0 }}</strong><small>zostało: <b>{{ s.remaining_label }}</b>{% if s.cartons is not none %} · {{ s.cartons }} kart. × {{ order.pcs_per_carton }}{% if s.carton_rest %} + {{ s.carton_rest }}{% endif %}{% endif %}</small></div>
+  <div><span>Cykle maszyny · dok. 7</span><strong>{{ ('≥ ' if s.partial else '') ~ (s.cycles|n0) if s.cycles is not none else '—' }}</strong><small>{{ 'licznik niepełny — brak odczytów części zmian' if s.partial else 'z licznika PLC (suma zmian koloru)' }}</small></div>
+  <div class="{{ 'trio-bad' if s.scrap is not none and s.scrap < 0 else '' }}"><span>Braki = cykle × krotność − dobre</span><strong>{{ s.scrap|n0 if s.scrap is not none else '—' }}</strong><small>{% if s.scrap_pct is not none %}{{ s.scrap_pct|num }}% cykli{% elif s.partial %}puste do czasu doliczenia odczytów{% else %}brak licznika{% endif %}</small></div>
+</section>
+
+<section class="panel checks-panel"><h2>Punkty kontrolne koloru</h2><ul class="check-list">
+  {% for code in ('K4', 'K5', 'K6', 'K7', 'K8', 'K9', 'K10', 'K12') %}{% if checks.get(code) %}{% set c = checks[code] %}<li class="check-{{ lvl.get(c[0], 'none') }}"><b>{{ code }}</b> {{ settlement_checks[code] }} — {{ c[1] }}</li>{% endif %}{% endfor %}
+</ul></section>
+
+<form method="post" action="{{ url_for('settlement_color_save', color_id=color.id) }}" autocomplete="off" id="zmiany">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="visually-hidden" type="submit" name="action" value="{{ 'save_shifts' if editable else '' }}" tabindex="-1" aria-hidden="true">Zapisz</button>
+  <section class="form-section"><h2>Raport zmianowy (dok. 4) + licznik PLC (dok. 7) + kartony (dok. 9)</h2>
+    <p class="muted">Jeden wiersz = jedna zmiana. „Wykonano” zawsze z nadwyżką. Licznik PLC: stan na koniec zmiany, narastająco w obrębie koloru — pierwsza zmiana koloru liczy od 0; zaznacz „od 0”, gdy licznik wyzerowano w trakcie koloru (nowa kartka tygodniowa).</p>
+    <div class="table-scroll"><table class="shift-table"><thead><tr><th>Data</th><th>Zm.</th><th>Operator</th><th class="r">Kartony</th><th class="r">Szt./kart.</th><th class="r">Wykonano</th><th class="r">Zostało</th><th class="r">Zostało (wpis op.)</th><th class="r">Licznik PLC</th><th>Od 0</th><th class="r">Cykle</th><th class="r">Cykl s</th><th>Uwagi</th><th></th></tr></thead><tbody>
+    {% for r in s.rows %}{% set x = r.s %}{% set p = 's' ~ x.id ~ '_' %}<tr class="{{ 'row-big' if r.bad else '' }}">
+      {% if editable %}
+      <td><input type="date" name="{{ p }}shift_date" value="{{ x.shift_date.isoformat() }}"></td>
+      <td><select name="{{ p }}shift">{% for z in shift_names %}<option {% if x.shift == z %}selected{% endif %}>{{ z }}</option>{% endfor %}</select></td>
+      <td><input class="op-input" name="{{ p }}operator" value="{{ x.operator or '' }}"></td>
+      <td class="r"><input class="qty-input small-input" name="{{ p }}cartons" value="{{ x.cartons if x.cartons is not none else '' }}"></td>
+      <td class="r"><input class="qty-input small-input" name="{{ p }}pcs_per_carton" value="{{ x.pcs_per_carton or '' }}" placeholder="{{ order.pcs_per_carton or '' }}"></td>
+      <td class="r"><input class="qty-input" name="{{ p }}qty_good" value="{{ x.qty_good }}"></td>
+      {% else %}
+      <td>{{ x.shift_date|dt }}</td><td>{{ x.shift }}</td><td>{{ x.operator or '' }}</td><td class="r">{{ x.cartons if x.cartons is not none else '' }}</td><td class="r">{{ x.pcs_per_carton or '' }}</td><td class="r qty">{{ x.qty_good|n0 }}</td>
+      {% endif %}
+      <td class="r"><b>{{ ('0 + ' ~ (-r.remaining)) if r.remaining < 0 else r.remaining }}</b></td>
+      {% if editable %}
+      <td class="r"><input class="qty-input small-input" name="{{ p }}remaining_entered" value="{{ x.remaining_entered if x.remaining_entered is not none else '' }}"></td>
+      <td class="r"><input class="qty-input" name="{{ p }}plc_counter" value="{{ x.plc_counter if x.plc_counter is not none else '' }}"></td>
+      <td><input type="checkbox" name="{{ p }}counter_reset" value="1" {% if x.counter_reset %}checked{% endif %} aria-label="licznik od 0"></td>
+      {% else %}
+      <td class="r">{{ x.remaining_entered if x.remaining_entered is not none else '' }}</td><td class="r">{{ x.plc_counter if x.plc_counter is not none else '' }}</td><td>{{ '✓' if x.counter_reset else '' }}</td>
+      {% endif %}
+      <td class="r {{ 'minus' if r.cycles is not none and r.cycles < 0 else '' }}"><b>{{ r.cycles if r.cycles is not none else '—' }}</b></td>
+      {% if editable %}
+      <td class="r"><input class="qty-input small-input" name="{{ p }}cycle_s" value="{{ x.cycle_s|num if x.cycle_s else '' }}"></td>
+      <td><input class="note-input" name="{{ p }}notes" value="{{ x.notes or '' }}"></td>
+      <td class="actions"><button class="btn btn-small btn-danger" type="submit" name="action" value="delete_shift:{{ x.id }}" data-confirm="Usunąć zmianę {{ x.shift_date|dt }} {{ x.shift }}?">×</button></td>
+      {% else %}<td class="r">{{ x.cycle_s|num if x.cycle_s else '' }}</td><td>{{ x.notes or '' }}</td><td></td>{% endif %}
+    </tr>{% if r.flags %}<tr class="flag-row"><td colspan="14">{% for code, msg in r.flags %}<span class="flag flag-{{ 'info' if code == 'K5i' else 'bad' }}">{{ code|replace('i', '') }}: {{ msg }}</span>{% endfor %}</td></tr>{% endif %}
+    {% else %}<tr><td colspan="14" class="empty">Brak zmian. Dodaj pierwszą zmianę tego koloru poniżej.</td></tr>{% endfor %}
+    {% if s.rows %}<tr class="total-row"><td colspan="5"><strong>Razem kolor</strong> {{ s.start|dt('%d.%m') }} – {{ s.end|dt('%d.%m') }}</td><td class="r"><strong>{{ s.good|n0 }}</strong></td><td class="r"><strong>{{ s.remaining_label }}</strong></td><td colspan="3"></td><td class="r"><strong>{{ s.cycles|n0 if s.cycles is not none else '—' }}</strong></td><td colspan="3"></td></tr>{% endif %}
+    </tbody></table></div>
+    {% if editable %}
+    <div class="add-shift"><h3>Dodaj zmianę</h3><div class="add-shift-grid">
+      <label>Data<input type="date" name="new_shift_date" value="{{ next_shift.date }}"></label>
+      <label>Zmiana<select name="new_shift">{% for z in shift_names %}<option {% if next_shift.shift == z %}selected{% endif %}>{{ z }}</option>{% endfor %}</select></label>
+      <label>Operator<input class="op-input" name="new_operator" placeholder="np. AM, K.Z."></label>
+      <label>Kartony<input class="qty-input" name="new_cartons" inputmode="numeric"></label>
+      <label>Szt./kart.<input class="qty-input" name="new_pcs_per_carton" placeholder="{{ order.pcs_per_carton or '' }}" inputmode="numeric"></label>
+      <label>Wykonano (dobre)<input class="qty-input" name="new_qty_good" inputmode="numeric" placeholder="puste = kartony × szt."></label>
+      <label>Zostało (wpis op.)<input class="qty-input" name="new_remaining_entered" inputmode="numeric"></label>
+      <label>Licznik PLC<input class="qty-input" name="new_plc_counter" inputmode="numeric"></label>
+      <label class="check-inline">Od 0<input type="checkbox" name="new_counter_reset" value="1"></label>
+      <label>Cykl s<input class="qty-input" name="new_cycle_s" value="{{ last.cycle_s|num if last and last.cycle_s else '' }}" inputmode="decimal"></label>
+      <label class="span-2">Uwagi<input name="new_notes"></label>
+    </div>
+    <div class="form-actions"><span class="spacer"></span>{% if s.rows %}<button class="btn" type="submit" name="action" value="save_shifts">Zapisz poprawki w tabeli</button>{% endif %}<button class="btn btn-primary" type="submit" name="action" value="add_shift">+ Dodaj zmianę</button></div></div>
+    {% endif %}
+  </section>
+</form>
+
+<form method="post" action="{{ url_for('settlement_color_save', color_id=color.id) }}" autocomplete="off" id="rozliczenie">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <section class="form-section"><h2>Koniec koloru i wiersz statystyki (dok. 6)</h2>
+    <div class="form-grid doc-meta">
+      <label>Dół specyfikacji — wyprodukowano (dok. 3)<input name="spec_good" value="{{ color.spec_good if color.spec_good is not none else '' }}" inputmode="numeric" {% if not editable %}disabled{% endif %} placeholder="{{ s.good }}"></label>
+      <label>Waga netto 1 szt. [g] (waga w biurze)<input name="net_g" value="{{ color.net_g|num if color.net_g else '' }}" inputmode="decimal" {% if not editable %}disabled{% endif %}></label>
+      <label>Waga brutto — cały wtrysk z wlewkiem [g]<input name="shot_g" value="{{ color.shot_g|num if color.shot_g else '' }}" inputmode="decimal" {% if not editable %}disabled{% endif %}></label>
+      <label>Czas cyklu [s] (dok. 7)<input name="stat_cycle_s" value="{{ color.stat_cycle_s|num if color.stat_cycle_s else '' }}" placeholder="{{ s.last_cycle_s|num if s.last_cycle_s else '' }}" inputmode="decimal" {% if not editable %}disabled{% endif %}></label>
+      <label>Wzór produkcyjny nr<input name="pattern_no" value="{{ color.pattern_no or suggested_pattern or '' }}" {% if not editable %}disabled{% endif %}></label>
+      <label>Kto zakładał formę<input name="mounted_by" value="{{ color.mounted_by or '' }}" {% if not editable %}disabled{% endif %}></label>
+      <label>Kto demontował formę<input name="dismounted_by" value="{{ color.dismounted_by or '' }}" {% if not editable %}disabled{% endif %}></label>
+      <label>Wzór z zakończenia (wisi na formie)<select name="pattern_at_end" {% if not editable %}disabled{% endif %}><option value="">—</option><option {% if color.pattern_at_end == 'TAK' %}selected{% endif %}>TAK</option><option {% if color.pattern_at_end == 'NIE' %}selected{% endif %}>NIE</option></select></label>
+      <label>Rozliczył(a)<input name="settled_by" value="{{ color.settled_by or 'Plastema' }}" {% if not editable %}disabled{% endif %}></label>
+      <label class="span-2">Uwagi<input name="notes" value="{{ color.notes or '' }}" {% if not editable %}disabled{% endif %}></label>
+    </div>
+    <dl class="formula-list">
+      <div><dt>Średnia na zmianę</dt><dd>28 800 ÷ {{ values.cycle_s|num if values.cycle_s else '?' }} s × {{ order.cavities or 1 }} = <b>{{ values.avg_per_shift|n0 if values.avg_per_shift else '—' }}</b> szt. (w dół)</dd></div>
+      <div><dt>Realny czas cyklu</dt><dd>28 800 × {{ order.cavities or 1 }} ÷ {{ values.avg_per_shift or '?' }} = <b>{{ values.real_cycle_s|num if values.real_cycle_s else '—' }}</b> s</dd></div>
+      <div><dt>Waga 1 szt. brutto</dt><dd>wtrysk ÷ krotność = <b>{{ values.piece_gross_g|num if values.piece_gross_g else '—' }}</b> g{% if color.shot_g and color.net_g %} · wlewek {{ (color.shot_g - color.net_g * (order.cavities or 1))|num }} g{% endif %}</dd></div>
+      <div><dt>Zużycie materiału</dt><dd>{% if use %}{{ use.cycles|n0 }} cykli × {{ color.shot_g|num }} g = <b>{{ use.total|num }} kg</b>, z tego barwnik {{ use.colorant|num }} kg{% else %}zważ wtrysk, żeby policzyć{% endif %}</dd></div>
+    </dl>
+    {% if editable %}<div class="form-actions">
+      {% if s.scrap is none %}<label class="check-inline"><input type="checkbox" name="no_counter" value="1"> rozlicz z pustymi brakami (licznik niepełny / cykle na innej kartce)</label>{% endif %}
+      <span class="spacer"></span><button class="btn" type="submit" name="action" value="save_end">Zapisz</button>
+      <button class="btn btn-primary btn-done" type="submit" name="action" value="settle" data-confirm="Rozliczyć kolor {{ color.color_name }} i dopisać wiersz do statystyki?">Rozlicz kolor → statystyka</button></div>{% endif %}
+  </section>
+</form>
+
+{% if settled and stat %}
+<section class="panel"><h2>Wiersz w statystyce (dok. 6)</h2>
+  <div class="table-scroll"><table class="analysis-table"><thead><tr><th>Produkt</th><th>Start–koniec</th><th>Zam.</th><th>Masz.</th><th class="r">Ilość</th><th class="r">Cykl s</th><th class="r">Śr./zm.</th><th class="r">Krotn.</th><th class="r">Realny cykl</th><th class="r">Braki szt.</th><th class="r">Netto g</th><th class="r">Brutto g</th><th class="r">1 szt. brutto</th><th>Wzór</th><th>Tworzywo</th><th>Barwnik</th><th class="r">Doz.</th></tr></thead><tbody>
+  <tr><td>{{ stat.product_name }}</td><td>{{ stat.start_date|dt('%d.%m') }}–{{ stat.end_date|dt('%d.%m') }}</td><td>{{ stat.internal_order }}</td><td>{{ stat.machine_no }}</td><td class="r qty">{{ stat.qty|n0 }}</td>
+    <td class="r">{{ stat.cycle_s|num if stat.cycle_s else '' }}</td><td class="r">{{ stat.avg_per_shift|n0 if stat.avg_per_shift else '' }}</td><td class="r">{{ stat.cavities|n0 if stat.cavities else '' }}</td><td class="r">{{ '%.3f'|format(stat.real_cycle_s) if stat.real_cycle_s else '' }}</td>
+    <td class="r">{{ stat.scrap_pcs|n0 if stat.scrap_pcs is not none else '' }}</td><td class="r">{{ stat.net_g|num if stat.net_g else '' }}</td><td class="r">{{ stat.shot_g|num if stat.shot_g else '' }}</td><td class="r">{{ stat.piece_gross_g|num if stat.piece_gross_g else '' }}</td>
+    <td>{{ stat.pattern_no or '' }}</td><td><small>{{ stat.material }}</small></td><td>{{ stat.colorant or '' }}</td><td class="r">{{ stat.dosage_pct|num if stat.dosage_pct is not none else '' }}%</td></tr>
+  </tbody></table></div>
+  <form method="post" action="{{ url_for('settlement_color_save', color_id=color.id) }}" class="form-actions"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <a class="btn btn-secondary" href="{{ url_for('settlement_labels', color_id=color.id) }}">Etykiety kartonów</a>
+    <span class="spacer"></span><button class="btn btn-danger" type="submit" name="action" value="unsettle" data-confirm="Cofnąć rozliczenie? Wiersz zostanie usunięty ze statystyki.">Cofnij rozliczenie</button></form>
+</section>
+
+<section class="panel" id="przyjecie"><h2>Przyjęcie na magazyn wyrobów gotowych (dok. 10)</h2>
+  <form method="post" action="{{ url_for('settlement_color_save', color_id=color.id) }}" class="add-order-line"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Data<input type="date" name="receipt_date" value="{{ today.isoformat() }}"></label>
+    <label>Godzina<input name="receipt_time" placeholder="np. 14:30"></label>
+    <label>Ilość [szt.]<input class="qty-input" name="qty" value="{{ (stat.qty|int) - (receipts|sum(attribute='qty')) if (stat.qty|int) > (receipts|sum(attribute='qty')) else '' }}" inputmode="numeric"></label>
+    <label>Nr PW<input name="pw_number" placeholder="auto: MM/NNNN"></label>
+    <label>Miejsce<input name="location" placeholder="np. regał A3 / paleta"></label>
+    <label>Przyjął<select name="received_by">{% for r in fg_receivers %}<option>{{ r }}</option>{% endfor %}</select></label>
+    <label class="search">Uwagi<input name="notes"></label>
+    <button class="btn btn-primary" type="submit" name="action" value="add_receipt">Przyjęto na magazyn</button>
+  </form>
+  <div class="table-scroll"><table class="analysis-table"><thead><tr><th>Data</th><th>Godz.</th><th>Nr PW</th><th class="r">Ilość</th><th>Przyjął</th><th>Uwagi</th><th></th></tr></thead><tbody>
+  {% for r in receipts %}<tr><td>{{ r.receipt_date|dt }}</td><td>{{ r.receipt_time or '' }}</td><td><span class="code">{{ r.pw_number }}</span></td><td class="r qty">{{ r.qty|n0 }}</td><td>{{ r.received_by or '' }}</td><td>{{ r.notes or '' }}</td>
+    <td class="actions"><form method="post" action="{{ url_for('settlement_color_save', color_id=color.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-small btn-danger" type="submit" name="action" value="delete_receipt:{{ r.id }}" data-confirm="Usunąć PW {{ r.pw_number }}?">×</button></form></td></tr>
+  {% else %}<tr><td colspan="7" class="empty">Kartony nie zostały jeszcze przyjęte na magazyn.</td></tr>{% endfor %}
+  <tr class="total-row"><td colspan="3"><strong>Przyjęto razem / statystyka</strong></td><td class="r"><strong>{{ receipts|sum(attribute='qty') }} / {{ stat.qty|n0 }}</strong></td><td colspan="3"></td></tr>
+  </tbody></table></div>
+</section>
+
+<section class="panel" id="zuzycie"><h2>Zużycie materiału w magazynie</h2>
+  {% if zu %}<p>Dokument zużycia <a href="{{ url_for('machine_doc', doc_id=zu.id) }}"><span class="code">{{ zu.number }}</span></a> — {{ zu.status|lower }}. Magazynier zatwierdza go w module Maszyny.</p>
+  {% elif use %}<form method="post" action="{{ url_for('settlement_color_save', color_id=color.id) }}" class="form-actions"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <span>{{ use.material|num }} kg {{ order.material_index or 'tworzywa' }}{% if use.colorant %} + {{ use.colorant|num }} kg {{ color.colorant_index or 'barwnika' }}{% endif %} na maszynie {{ order.machine_no }}</span>
+    <span class="spacer"></span><button class="btn btn-secondary" type="submit" name="action" value="zu">Utwórz dokument zużycia (ZU)</button></form>
+  {% else %}<p class="muted">Brak danych do policzenia zużycia.</p>{% endif %}
+</section>
+{% endif %}
+<script src="{{ url_for('static', filename='orders.js') }}" defer></script>
+{% endblock %}

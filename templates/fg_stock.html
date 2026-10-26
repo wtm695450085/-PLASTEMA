@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Magazyn wyrobów gotowych · Plastema{% endblock %}
+{% block body_class %}theme-teal{% endblock %}
+{% block module_name %}PLASTEMA · Magazyn wyrobów gotowych{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Wyroby gotowe · stan na produkt (BBBB) i szarżę</div><h1>Magazyn wyrobów gotowych</h1>
+  <p class="muted">Przyjęcia PW z rozliczenia produkcji zwiększają stan od razu. Wydanie do klienta dokumentem WZ (z zamówienia ZK, szarże od najstarszej). Zwroty — ZW, inwentaryzacja — INW-WG.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('fg_docs') }}">Dokumenty WZ / ZW / INW</a></section>
+
+<div class="stat-grid">
+  <div class="stat-card stat-total"><span>Na stanie</span><strong>{{ totals.pcs|n0 }}</strong><small>szt. · {{ totals.products }} produktów · {{ totals.batches }} szarż</small></div>
+  <a class="stat-card" href="{{ url_for('fg_docs', typ='WZ', status='OTWARTY') }}"><span>Otwarte WZ</span><strong>{{ open_docs.get('WZ', 0) }}</strong><small>do wydania</small></a>
+  <a class="stat-card" href="{{ url_for('fg_docs', typ='INW', status='OTWARTY') }}"><span>Inwentaryzacje otwarte</span><strong>{{ open_docs.get('INW', 0) }}</strong><small>arkusze INW-WG</small></a>
+  <div class="stat-card {{ 'stat-warn' if totals.negative else '' }}"><span>Stany ujemne</span><strong>{{ totals.negative }}</strong><small>{{ 'sprawdź kartotekę / inwentaryzacja' if totals.negative else 'brak' }}</small></div>
+</div>
+
+{% if ready %}<section class="panel waiting-panel"><h2>Zamówienia klientów z towarem na magazynie — do wydania ({{ ready|length }})</h2>
+  <div class="waiting-list">{% for z in ready %}<form method="post" action="{{ url_for('fg_doc_new') }}" class="waiting-item"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="doc_type" value="WZ"><input type="hidden" name="zk" value="{{ z.id }}">
+    <a href="{{ url_for('order_detail', order_id=z.id) }}"><span class="code zk-code">{{ z.number }}</span></a> {{ z.short_name }} <small>dostawa {{ z.delivery_date|dt }}</small>
+    <button class="btn btn-small btn-secondary" type="submit">Przygotuj WZ</button></form>{% endfor %}</div></section>{% endif %}
+
+<form class="filters" method="get">
+  <label class="search"><span>Szukaj</span><input name="q" value="{{ query }}" placeholder="nazwa, kod BBBB, miejsce"></label>
+  <label><span>Klient</span><select name="klient"><option value="">Wszyscy</option>{% for c in clients %}<option value="{{ c.id }}" {% if client_id == c.id|string %}selected{% endif %}>{{ c.short_name }}</option>{% endfor %}</select></label>
+  <label><span>Pokaż</span><select name="pokaz"><option value="">na stanie lub zamówione</option><option value="wszystkie" {% if show == 'wszystkie' %}selected{% endif %}>wszystkie produkty</option></select></label>
+  <button class="btn btn-secondary" type="submit">Filtruj</button>
+</form>
+<div class="table-card"><div class="table-scroll"><table><thead><tr><th>BBBB</th><th>Klient</th><th>Produkt</th><th class="r">Na stanie</th><th>Kartony</th><th class="r">Szarże</th><th>Miejsce</th><th class="r">Zamówione (ZK otwarte)</th><th class="r">Wolne</th><th></th></tr></thead><tbody>
+{% for i in items %}<tr class="{{ 'row-big' if i.qty < 0 else ('row-zero' if i.qty == 0 else '') }}">
+  <td><span class="code">{{ '%04d'|format(i.code) }}</span></td><td>{{ i.short_name }}<small>{{ i.client_code }}</small></td>
+  <td><strong>{{ i.name }}</strong><small>{{ i.client_code }}-{{ '%04d'|format(i.code) }}-{{ i.color_code or '000' }}</small></td>
+  <td class="r qty">{{ i.qty|n0 }}</td><td>{% if i.cartons %}{{ i.cartons[0] }} × {{ i.pcs_per_carton }}{% if i.cartons[1] %} + {{ i.cartons[1] }}{% endif %}{% else %}—{% endif %}</td>
+  <td class="r">{{ i.batches or 0 }}</td><td>{{ i.location or '—' }}</td><td class="r">{{ i.demand|n0 if i.demand else '—' }}</td>
+  <td class="r {{ 'minus' if i.available < 0 else 'plus' if i.available > 0 else '' }}">{{ i.available|n0 }}</td>
+  <td class="actions"><a class="btn btn-small" href="{{ url_for('fg_product', product_id=i.id) }}">Kartoteka</a></td>
+</tr>{% else %}<tr><td colspan="10" class="empty">Magazyn jest pusty. Towar trafia tu z rozliczenia produkcji — przyjęcie PW na kolorze zamówienia produkcji.</td></tr>{% endfor %}
+</tbody></table></div></div>
+<p class="muted catalog-hint">Wolne = na stanie − ilości niewydane z otwartych zamówień klientów (przyjęte i w produkcji). Ujemne wolne = trzeba jeszcze wyprodukować.</p>
+{% endblock %}

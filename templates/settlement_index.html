@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Rozliczenie produkcji · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Rozliczenie produkcji{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Instrukcja rozliczania produkcji · wersja 1</div><h1>Rozliczenie produkcji</h1>
+  <p class="muted">Dla każdego koloru trzy liczby: ile miało być (specyfikacja), ile jest dobrych (kartony) i ile cykli zrobiła maszyna (licznik PLC). Cykle − dobre = braki.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('settlement_new') }}">+ Zamówienie produkcji</a></section>
+
+{% if waiting %}<section class="panel waiting-panel"><h2>Przyjęte zamówienia klientów bez zamówienia produkcji ({{ waiting|length }})</h2>
+  <div class="waiting-list">{% for w in waiting %}<form method="post" action="{{ url_for('settlement_from_zk', zk_id=w.id) }}" class="waiting-item"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <a href="{{ url_for('order_detail', order_id=w.id) }}"><span class="code zk-code">{{ w.number }}</span></a> {{ w.short_name }} <small>dostawa {{ w.delivery_date|dt }}</small>
+    <button class="btn btn-small btn-secondary" type="submit">Utwórz zamówienia produkcji</button></form>{% endfor %}</div></section>{% endif %}
+
+<div class="stat-grid">{% for key, label in prod_order_statuses.items() %}<a class="stat-card" href="{{ url_for('settlement_index', status=key) }}"><span>{{ key }}</span><strong>{{ counts.get(key, 0) }}</strong><small>{{ label }}</small></a>{% endfor %}</div>
+<form class="filters" method="get">
+  <label class="search"><span>Szukaj</span><input name="q" value="{{ query }}" placeholder="nr zamówienia, produkt, klient, kod szarży"></label>
+  <label><span>Status</span><select name="status"><option value="">otwarte (planowane + w produkcji)</option><option value="ALL" {% if status == 'ALL' %}selected{% endif %}>wszystkie</option>{% for key in prod_order_statuses %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ key|lower }}</option>{% endfor %}</select></label>
+  <label><span>Maszyna</span><select name="maszyna"><option value="">wszystkie</option>{% for m in range(1, 10) %}<option {% if machine == m|string %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></label>
+  <button class="btn btn-secondary" type="submit">Filtruj</button>
+</form>
+<div class="table-card"><div class="table-scroll"><table><thead><tr><th>Zam. prod.</th><th>Kod szarży</th><th>Klient</th><th>Produkt</th><th class="r">Masz.</th><th>Forma</th><th class="r">Ilość</th><th class="r">Dobre</th><th>Kolory</th><th>Ostatnia zmiana</th><th>Status</th><th></th></tr></thead><tbody>
+{% for o in orders %}<tr>
+  <td><span class="code">{{ o.number }}</span>{% if o.zk_number %}<small>{{ o.zk_number }}</small>{% endif %}</td><td>{{ o.batch_code or '—' }}</td>
+  <td>{{ o.short_name }}</td><td><strong>{{ o.product_name }}</strong></td><td class="r"><b class="machine-no">{{ o.machine_no or '?' }}</b></td>
+  <td>{{ o.mold_no or '—' }}</td><td class="r">{{ o.qty_total|n0 }}</td><td class="r qty">{{ o.good|n0 }}</td>
+  <td>{{ o.settled }} / {{ o.colors }} rozliczonych</td><td>{{ o.last_shift|dt }}</td>
+  <td><span class="status status-{{ 'w-produkcji' if o.status == 'W PRODUKCJI' else ('zrealizowane' if o.status == 'ZAKOŃCZONE' else ('anulowane' if o.status == 'ANULOWANE' else 'przyjęte')) }}">{{ o.status|lower }}</span></td>
+  <td class="actions"><a class="btn btn-small btn-primary" href="{{ url_for('settlement_order', order_id=o.id) }}">Otwórz</a></td>
+</tr>{% else %}<tr><td colspan="12" class="empty">Brak zamówień produkcji. Utwórz je z przyjętego zamówienia klienta albo ręcznie (planowanie w biurze).</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

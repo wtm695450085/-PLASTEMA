@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Nowe zamówienie · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Zamówienia{% endblock %}
+{% block content %}
+<div class="form-heading"><div><a class="back" href="{{ url_for('orders_index') }}">← Zamówienia</a><div class="eyebrow">Krok {{ 2 if client else 1 }} z 2</div><h1>Nowe zamówienie klienta</h1>
+  <p class="muted">Po zapisaniu system nada kod <span class="code">ZK AAA RR MM DD NNN</span> i sprawdzi formy, surowce, barwniki oraz wtryskarki.</p></div></div>
+
+<form method="get" class="filters">
+  <label class="search"><span>1. Klient (identyfikacja klienta — kod AAA)</span><select name="klient" required><option value="">— wybierz klienta —</option>{% for c in clients %}<option value="{{ c.id }}" {% if client and client.id == c.id %}selected{% endif %}>{{ c.code }} · {{ c.short_name }} — {{ c.name }}</option>{% endfor %}</select></label>
+  <button class="btn btn-secondary" type="submit">{{ 'Zmień klienta' if client else 'Dalej' }}</button>
+  <a class="clear" href="{{ url_for('client_form') }}">+ nowy klient</a>
+</form>
+
+{% if client %}
+<form method="post" class="supplier-form" autocomplete="off">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="klient" value="{{ client.id }}">
+  <section class="form-section"><h2>2. Dane zamówienia — {{ client.short_name }} <span class="code">{{ client.code }}</span></h2><div class="form-grid doc-meta">
+    <label>Data złożenia zamówienia *<input type="date" name="order_date" value="{{ form.order_date or today.isoformat() }}" required></label>
+    <label>Żądany termin dostawy<input type="date" name="requested_date" value="{{ form.requested_date or '' }}"></label>
+    <label>Kanał złożenia<select name="channel">{% for ch in order_channels %}<option {% if form.channel == ch %}selected{% endif %}>{{ ch }}</option>{% endfor %}</select></label>
+    <label>Odebrał(a)<select name="received_by">{% for r in order_receivers %}<option {% if form.received_by == r %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+    <label>Osoba zamawiająca<input name="ordered_by" value="{{ form.ordered_by or '' }}"></label>
+    <label>E-mail zamawiającego<input type="email" name="ordered_email" value="{{ form.ordered_email or '' }}"></label>
+    <label>Numer zamówienia klienta<input name="client_ref" value="{{ form.client_ref or '' }}" placeholder="np. PO/2026/123"></label>
+    <label>Uwagi<input name="notes" value="{{ form.notes or '' }}"></label>
+  </div></section>
+
+  <section class="form-section"><h2>3. Pozycje — identyfikacja produktu (BBBB) i koloru (CCC)</h2>
+    <p class="muted">Zacznij pisać nazwę lub kod produktu i wybierz z podpowiedzi. Kolor domyślnie z karty produktu.
+      Produktu nie ma na liście? <a href="{{ url_for('product_form', klient=client.id) }}">Dodaj nowy produkt</a> (nowa para klient–produkt).</p>
+    <datalist id="client-products">{% for p in products %}<option value="{{ '%04d'|format(p.code) }} {{ p.name }}"></option>{% endfor %}</datalist>
+    <div class="table-scroll"><table class="order-lines-table"><thead><tr><th>Lp.</th><th>Produkt</th><th class="r">Ilość szt.</th><th>Kolor (CCC)</th><th>Uwagi</th></tr></thead><tbody>
+    {% for i in range(1, 9) %}<tr>
+      <td class="num">{{ i }}</td>
+      <td><input list="client-products" name="product_{{ i }}" value="{{ form['product_' ~ i] or '' }}" placeholder="{{ 'kod lub nazwa produktu' if i == 1 else '' }}"></td>
+      <td><input class="qty-input" name="qty_{{ i }}" value="{{ form['qty_' ~ i] or '' }}" inputmode="numeric"></td>
+      <td><select name="color_{{ i }}"><option value="">z karty produktu</option>{% for col in colors %}<option value="{{ col.id }}" {% if form['color_' ~ i] == col.id|string %}selected{% endif %}>{{ col.code }} {{ col.name }}</option>{% endfor %}</select></td>
+      <td><input class="note-input" name="note_{{ i }}" value="{{ form['note_' ~ i] or '' }}"></td>
+    </tr>{% endfor %}
+    </tbody></table></div>
+    <p class="muted catalog-hint">Klient ma {{ products|length }} produktów w bazie. Kolejne pozycje dodasz na karcie zamówienia.</p>
+  </section>
+  <div class="form-actions"><span class="spacer"></span><a class="btn btn-ghost" href="{{ url_for('orders_index') }}">Anuluj</a><button class="btn btn-primary" type="submit">Nadaj kod ZK i sprawdź zasoby</button></div>
+</form>
+{% endif %}
+{% endblock %}

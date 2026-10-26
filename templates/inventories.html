@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Inwentaryzacje · Plastema{% endblock %}
+{% block content %}
+<section class="hero"><div><div class="eyebrow">Spisy z natury</div><h1>Inwentaryzacje</h1><p class="muted">Otwarty arkusz można wypełniać i zapisywać wiele razy. Po zatwierdzeniu spis aktualizuje stany magazynowe i nie da się go już zmienić.</p></div><a class="btn btn-primary" href="{{ url_for('create_inventory') }}">+ Nowa inwentaryzacja</a></section>
+<div class="table-card"><div class="table-scroll"><table><thead><tr><th>Numer</th><th>Data spisu</th><th>Zakres</th><th>Status</th><th>Policzono</th><th class="r">Wartość zł</th><th>Spisujący</th><th></th></tr></thead><tbody>
+{% for i in inventories %}<tr>
+  <td><span class="code">{{ i.number }}</span></td><td><strong>{{ i.count_date.strftime('%d.%m.%Y') }}</strong></td>
+  <td>{{ inventory_scopes.get(i.scope, i.scope) }}</td>
+  <td><span class="badge {{ 'badge-material' if i.status == 'ZATWIERDZONA' else 'badge-color' }}">{{ i.status|lower }}</span></td>
+  <td>{{ i.counted }} / {{ i.lines }}</td><td class="r">{{ i.value|num }}</td><td>{{ i.counted_by or '—' }}<small>{{ i.notes or '' }}</small></td>
+  <td class="actions"><a class="btn btn-small" href="{{ url_for('inventory_sheet', inventory_id=i.id) }}">{{ 'Wypełnij' if i.status == 'OTWARTA' else 'Podgląd' }}</a> <a class="btn btn-small" href="{{ url_for('inventory_sheet', inventory_id=i.id, druk=1) }}" target="_blank">Drukuj</a></td>
+</tr>{% else %}<tr><td colspan="8" class="empty">Nie ma jeszcze żadnej inwentaryzacji.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

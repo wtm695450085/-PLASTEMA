@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Rejestr montaży — forma {{ mold.mold_no }} · Plastema{% endblock %}
+{% block body_class %}theme-blue{% endblock %}
+{% block module_name %}PLASTEMA · Formy wtryskowe{% endblock %}
+{% block content %}
+<div class="form-heading"><div><a class="back" href="{{ url_for('mold_passport', mold_id=mold.id) }}#montaze">← Paszport formy {{ mold.mold_no }}</a>
+  <div class="eyebrow">Rejestr montaży i awarii (wzór „PASZPORT FORMY WTRYSKOWEJ”)</div><h1>{{ 'Uzupełnij wpis' if mount.id or ref else 'Nowy wpis' }} — forma {{ mold.mold_no }}</h1>
+  {% if ref %}<p class="muted">Montaż odtworzony ze statystyki ({{ ref|replace('|', ', maszyna ') }}). Zapisanie utworzy wpis z uzupełnieniami (narzędziownia, awaria, zdjęcia).</p>{% endif %}</div></div>
+<form method="post" class="supplier-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="id" value="{{ mount.id or '' }}"><input type="hidden" name="ref" value="{{ ref }}">
+<section class="form-section"><div class="form-grid doc-meta">
+  {% for col, label, kind in fields %}{% set v = mount[col] if mount[col] is not none else '' %}
+  <label class="{{ 'span-2' if col in ('failure_desc', 'notes') else '' }}">{{ label }}
+    {% if kind == 'date' %}<input type="date" name="{{ col }}" value="{{ v.isoformat() if v and v.isoformat is defined else v }}">
+    {% elif col == 'failure_desc' %}<textarea name="{{ col }}" rows="3">{{ v }}</textarea>
+    {% else %}<input name="{{ col }}" value="{{ v }}" {% if col == 'failure_no' %}placeholder="np. {{ next_failure }}"{% elif col == 'photo_refs' %}placeholder="np. 3, 4 (numery zdjęć z paszportu)"{% endif %}>{% endif %}
+  </label>{% endfor %}
+</div></section>
+<div class="form-actions"><span class="spacer"></span><a class="btn btn-ghost" href="{{ url_for('mold_passport', mold_id=mold.id) }}#montaze">Anuluj</a><button class="btn btn-primary" type="submit">Zapisz wpis</button></div>
+</form>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Etykiety {{ order.product_name }} {{ color.color_name }} · Plastema{% endblock %}
+{% block body_class %}theme-blue labels-page{% endblock %}
+{% block module_name %}PLASTEMA · Rozliczenie produkcji{% endblock %}
+{% block content %}
+<div class="form-heading no-print"><div><a class="back" href="{{ url_for('settlement_color', color_id=color.id) }}">← {{ order.number }} {{ color.color_name }}</a>
+  <h1>Etykiety kartonów</h1><p class="muted">Każdy karton ma etykietę: klient, produkt, kolor, ilość, data i pieczątka Q.C. z numerem pracownika (K12).</p></div></div>
+{% if not print_now %}
+<form method="post" class="filters no-print"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label><span>Data na etykiecie</span><input type="date" name="label_date" value="{{ (color.label_date or today).isoformat() }}" required></label>
+  <label><span>Nr pracownika Q.C.</span><input name="qc_no" value="{{ color.qc_no or '' }}" required placeholder="np. 20"></label>
+  <label><span>Liczba etykiet</span><input name="count" value="{{ count }}" inputmode="numeric"></label>
+  <button class="btn btn-primary" type="submit">Przygotuj wydruk</button>
+</form>
+<p class="muted no-print">Proponowana liczba etykiet = liczba kartonów z dobrych sztuk{% if color.summary.carton_rest %} + 1 niepełny karton ({{ color.summary.carton_rest }} szt.){% endif %}.</p>
+{% else %}
+<div class="mail-bar no-print"><button class="btn btn-primary" type="button" data-print>Drukuj {{ count }} etykiet</button><a class="btn" href="{{ url_for('settlement_color', color_id=color.id) }}">Wróć do rozliczenia</a></div>
+<div class="label-sheet">
+  {% for i in range(count) %}{% set last_partial = loop.last and color.summary.carton_rest and color.summary.carton_rest > 0 and count > (color.summary.cartons or 0) %}
+  <article class="carton-label">
+    <header><b>PLASTEMA</b><span>{{ order.number }}{% if order.batch_code %} · szarża {{ order.batch_code }}{% endif %}</span></header>
+    <dl>
+      <div><dt>Klient</dt><dd>{{ order.short_name }}</dd></div>
+      <div><dt>Produkt</dt><dd><strong>{{ order.product_name }}</strong></dd></div>
+      <div><dt>Kolor</dt><dd><strong>{{ color.color_name }}</strong></dd></div>
+      <div><dt>Ilość</dt><dd><strong>{{ color.summary.carton_rest if last_partial else (per_carton or '') }} szt.</strong></dd></div>
+      <div><dt>Data</dt><dd>{{ color.label_date|dt }}</dd></div>
+    </dl>
+    {% if color.codes.production %}<div class="label-code"><img src="{{ barcode_uri(color.codes.production) }}" alt=""><span>{{ color.codes.production }}</span></div>{% endif %}
+    <div class="qc-stamp">Q.C. OK<b>{{ color.qc_no }}</b></div>
+  </article>{% endfor %}
+</div>
+{% endif %}
+<script src="{{ url_for('static', filename='orders.js') }}" defer></script>
+{% endblock %}
